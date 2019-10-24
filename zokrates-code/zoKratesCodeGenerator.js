@@ -275,9 +275,39 @@ ${packedString} ${returnString} h
 `;
   }
 
+  function generateNedServerConfig(wE, nE){
+    return `
+    module.exports = {
+      // IP on which the ned server should run
+      host: "127.0.0.1",
+      // Port on which the ned server should listen
+      port: 3005,
+      // Ethereum address of NED node
+      address: "0x00bd138abd70e2f00903268f3db08f2d25677c9e",
+      // Password to unlock NED node
+      password: "node0",
+      // Name of JSON RPC interface specified in truffle-config.js
+      network: "authority",
+      // Time Interval of the ned server triggering the netting in the ZoKrates execution environment
+      nettingInterval: 10000,
+      // Working directory of the file and the child process
+      workingDir: "./ned-server",
+      // File name to execute
+      fileName: "helloworld.sh",
+      // Execution environment for the file
+      executionEnv: "bash",
+      //No. of HHs with Energy Production
+      hhProduce: ${wE},
+      //No. of HHs with No Energy Production -> Only Consumption
+      hhConsume: ${nE}
+    };`
+  }
+
+
   let args = process.argv.slice(2);
 
   let code;
+  let code2;
   let wE;
   let nE;
 
@@ -290,6 +320,14 @@ ${packedString} ${returnString} h
     
     console.log("Generating zoKrates-Code for n = %s HHs with Energy & m = %s HHs without Energy and saving it to a file...", wE, nE);
     fs.writeFile('settlement-check.zok', code, 'utf8',(err) => {   
+      if (err) throw err;
+    })
+
+    console.log("Generating the corresponding code for the Configuration of the NED-Server...")
+    code2 = generateNedServerConfig(wE, nE);
+
+    console.log("Saving the generated code to the ned-server-config.js File...")
+    fs.writeFile('../ned-server-config.js', code2, 'utf8',(err)=> {
       if (err) throw err;
     })
 
