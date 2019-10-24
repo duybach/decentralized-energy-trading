@@ -105,9 +105,13 @@ async function init() {
     utilityAfterNetting = { ...utility };
     Object.setPrototypeOf(utilityAfterNetting, Utility.prototype);
     utilityAfterNetting.settle();
+    const hhWithEnergy = serverConfig.hhProduce;
+    const hhNoEnergy = serverConfig.hhConsume;
     const hhAddressToHash = zkHandler.generateProof(
       utilityBeforeNetting,
-      utilityAfterNetting
+      utilityAfterNetting,
+      hhWithEnergy,
+      hhNoEnergy
     );
     delete hhAddressToHash[ZERO_ADDRESS];
     if (Object.keys(hhAddressToHash).length > 0) {

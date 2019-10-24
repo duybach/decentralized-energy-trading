@@ -16,5 +16,9 @@ module.exports = {
   // File name to execute
   fileName: "helloworld.sh",
   // Execution environment for the file
-  executionEnv: "bash"
+  executionEnv: "bash",
+  //No. of HHs with Energy Production
+  hhProduce: 2,
+  //No. of HHs with No Energy Production -> Only Consumption
+  hhConsume: 1
 };
