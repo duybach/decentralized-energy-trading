@@ -1,21 +1,6 @@
 const fs = require('fs')
 
 function generateHelperFuncs(wE, nE) {
-  
-  /*
-  let numHouseholds = numHHs;
-  let withEnergy;
-  let noEnergy;
-  if((numHouseholds % 2) == 1){
-    withEnergy = (numHouseholds/2) - 0.5;
-    noEnergy = (numHouseholds/2) + 0.5;
-   numHouseholds++;
-  }
-  else{
-    withEnergy = numHouseholds/2;
-    noEnergy = withEnergy;
-  }
-  */
 
   console.log("# of HHs with Energy: ", wE);
   console.log("# of HHs without Energy: ", nE);
@@ -145,20 +130,6 @@ def sumNE(field[${nE}] hh) -> (field):
   }
   
   function generateCode(wE, nE) {
-    
-    /*let numHouseholds = numHHs;
-    let withEnergy;
-    let noEnergy;
-    if((numHouseholds % 2) == 1){
-     // withEnergy = (numHouseholds/2) - 0.5;
-     // noEnergy = (numHouseholds/2) + 0.5;
-     numHouseholds++;
-    }
-    else{
-      withEnergy = numHouseholds/2;
-      noEnergy = withEnergy;
-    }
-    */
 
     let energySumStringWE = "  field energySumWE = hhWithEnergy[0] + hhWithEnergyNet[0]";
     let energySumStringNE = "  field energySumNE = hhNoEnergy[0] + hhNoEnergyNet[0]";
@@ -325,6 +296,280 @@ ${packedString} ${returnString} h
 
     console.log("Generating the corresponding code for the Configuration of the NED-Server...")
     code2 = generateNedServerConfig(wE, nE);
+
+    console.log("Saving the generated code to the ned-server-config.js File...")
+    fs.writeFile('../ned-server-config.js', code2, 'utf8',(err)=> {
+      if (err) throw err;
+    })
+
+    function generateContracts(wE, nE){
+      let len = (wE+nE) * 2 + 2;
+
+      iVerifier = `
+pragma solidity >=0.5.0 <0.6.0;
+/**
+* @title Verifier contract interface
+*/
+contract IVerifier {
+  function verifyTx(
+    uint[2] memory a,
+    uint[2][2] memory b,
+    uint[2] memory c,
+    uint[${len}] memory input) public returns (bool);
+}`;
+
+      idUtility = `
+pragma solidity >=0.5.0 <0.6.0;
+/**
+* @title dUtility interface
+*/
+contract IdUtility {
+  /* Events */
+  event NewHousehold(address indexed household);
+  event NettingSuccess();
+
+  event CheckHashesSuccess();
+
+  event RenewableEnergyChanged(address indexed household, bytes32 newDeltaEnergy);
+
+  event NonRenewableEnergyChanged(address indexed household, bytes32 newDeltaEnergy);
+
+  /* Household management */
+  function addHousehold(address _household) external returns (bool);
+
+  function getHousehold(address _household) external view returns (bool, bytes32, bytes32);
+
+  function removeHousehold(address _household) external returns (bool);
+
+  /* Settlement verification related methods */
+  function setVerifier(address _verifier) external returns (bool);
+
+  function verifyNetting(
+    uint256[2] calldata _a,
+    uint256[2][2] calldata _b,
+    uint256[2] calldata _c,
+    uint256[${len}] calldata _input) external returns (bool success);
+
+  function checkHashes(address[] memory _households, bytes32[] memory _householdEnergyHashes) public returns (bool);
+
+  function getDeedsLength() external view returns (uint256);
+
+  /* dUtility household balance change tracking methods */
+  function updateRenewableEnergy(address _household, bytes32 deltaEnergy) external returns (bool);
+
+  function updateNonRenewableEnergy(address _household, bytes32 deltaEnergy) external returns (bool);
+
+}`;
+
+      dUtility = `
+pragma solidity >=0.5.0 <0.6.0;
+
+import "./interfaces/IdUtility.sol";
+import "./interfaces/IVerifier.sol";
+import "./Mortal.sol";
+
+/**
+* @title Utility onchain settlement verifier.
+* @dev Inherits from IdUtility. This approach is analoguous to UtilityBase.sol but with
+* private energy state changes.
+*/
+contract dUtility is Mortal, IdUtility {
+  struct Household {
+    // for checks if household exists
+    bool initialized;
+    // Hashes of (deltaEnergy+nonce+msg.sender)
+    bytes32 renewableEnergy;
+    bytes32 nonRenewableEnergy;
+  }
+
+  // mapping of all households
+  mapping(address => Household) households;
+  modifier onlyHousehold(address _household) {
+    require(msg.sender == _household, "No permission to access. Only household may access itself.");
+    _;
+  }
+
+  modifier householdExists(address _household) {
+    require(households[_household].initialized, "Household does not exist.");
+    _;
+  }
+
+  uint256[] public deeds;
+
+  IVerifier private verifier;
+
+  /**
+  * @dev Create a household with address _household to track energy production and consumption.
+  * Emits NewHousehold when household was added successfully.
+  * @param _household address of the household
+  * @return success bool if household does not already exists, should only be called by some authority
+  */
+  function addHousehold(address _household) external onlyOwner() returns (bool) {
+    return _addHousehold(_household);
+  }
+
+  /**
+  * @dev Get energy properties of _household.
+  * @param _household address of the household
+  * @return Household stats (initialized,
+  *                          renewableEnergy,
+  *                          nonRenewableEnergy)
+  *          of _household if _household exists
+  */
+  function getHousehold(address _household) external view householdExists(_household) returns (bool, bytes32, bytes32) {
+    Household memory hh = households[_household];
+    return (
+      hh.initialized,
+      hh.renewableEnergy,
+      hh.nonRenewableEnergy
+    );
+  }
+
+  /**
+  * @dev Removes a household.
+  * @param _household address of the household
+  * @return success bool if household does not already exists, should only be called by some authority
+  */
+  function removeHousehold(address _household) external onlyOwner() householdExists(_household) returns (bool) {
+    delete households[_household];
+  }
+
+  /**
+  * @dev Sets the address of a ZoKrates verifier contract.
+  * @param _verifier address of a deployed ZoKrates verifier contract
+  */
+  function setVerifier(address _verifier) external onlyOwner() returns (bool) {
+    verifier = IVerifier(_verifier);
+    return true;
+  }
+
+  /**
+  * @dev Verifies netting by using ZoKrates verifier contract.
+  * Emits NettingSuccess when netting could be verified
+  */
+  function verifyNetting(
+    uint256[2] calldata _a,
+    uint256[2][2] calldata _b,
+    uint256[2] calldata _c,
+    uint256[${len}] calldata _input) external returns (bool success) {
+    success = verifier.verifyTx(_a, _b, _c, _input);
+    if (success) {
+      uint256 record = block.number;
+      emit NettingSuccess();
+      deeds.push(record);
+    }
+  }
+
+  /**
+  * @dev Validates the equality of the given households and their energy hashes against
+  * dUtility's own recorded energy hashes (that the household server sent).
+  * Emits CheckHashesSuccess on successful validation.
+  * Throws when _households and _householdEnergyHashes length are not equal.
+  * Throws when an energy change hash mismatch has been found.
+  * @param _households array of household addresses to be checked.
+  * @param _householdEnergyHashes array of the corresponding energy hashes.
+  * @return true, iff, all given household energy hashes are mathes with the recorded energy hashes.
+  */
+  function checkHashes(address[] memory _households, bytes32[] memory _householdEnergyHashes) public returns (bool) {
+    require(_households.length == _householdEnergyHashes.length, "Households and energy hash array length must be equal.");
+    for (uint256 i = 0; i < _households.length; ++i) {
+      address addr = _households[i];
+      bytes32 energyHash = _householdEnergyHashes[i];
+      Household storage hh = households[addr];
+      require(hh.renewableEnergy == energyHash, "Household energy hash mismatch.");
+    }
+    emit CheckHashesSuccess();
+    return true;
+  }
+
+  /**
+  * @return uint256 length of all successfully verified settlements
+  */
+  function getDeedsLength() external view returns (uint256) {
+    return deeds.length;
+  }
+
+  /**
+  * @dev Updates a household's renewable energy state calling _updateEnergy
+  * @param _household address of the household
+  * @param _deltaEnergy bytes32 hash of (delta+nonce+senderAddr)
+  * @return success bool returns true, if function was called successfully
+  */
+  function updateRenewableEnergy(address _household, bytes32 _deltaEnergy)
+  external
+  onlyHousehold(_household)
+  returns (bool) {
+    _updateEnergy(_household, _deltaEnergy, true);
+  }
+
+  /**
+  * @dev Updates a household's non-renewable energy state calling _updateEnergy
+  * @param _household address of the household
+  * @param _deltaEnergy bytes32 hash of (delta+nonce+senderAddr)
+  * @return success bool returns true, if function was called successfully
+  */
+  function updateNonRenewableEnergy(address _household, bytes32 _deltaEnergy)
+  external onlyHousehold(_household)
+  returns (bool) {
+    _updateEnergy(_household, _deltaEnergy, false);
+  }
+
+  /**
+  * @dev Updates a household's energy state
+  * @param _household address of the household
+  * @param _deltaEnergy bytes32 hash of (delta+nonce+senderAddr)
+  * @param _isRenewable bool indicates whether said energy is renewable or non-renewable
+  * @return success bool returns true, if function was called successfully
+  */
+  function _updateEnergy(address _household, bytes32 _deltaEnergy, bool _isRenewable)
+  internal
+  householdExists(_household)
+  returns (bool) {
+    Household storage hh = households[_household];
+    if (_isRenewable) {
+      hh.renewableEnergy = _deltaEnergy;
+      emit RenewableEnergyChanged(_household, _deltaEnergy);
+    } else {
+      hh.nonRenewableEnergy = _deltaEnergy;
+      emit NonRenewableEnergyChanged(_household, _deltaEnergy);
+    }
+    return true;
+  }
+
+  /**
+  * @dev see UtilityBase.addHousehold
+  * @param _household address of household
+  * @return success bool
+  */
+  function _addHousehold(address _household) internal onlyOwner returns (bool) {
+    require(!households[_household].initialized, "Household already exists.");
+
+    // add new household to mapping
+    Household storage hh = households[_household];
+    hh.initialized = true;
+    hh.renewableEnergy = 0;
+    hh.nonRenewableEnergy = 0;
+
+    emit NewHousehold(_household);
+    return true;
+  }
+}`;
+
+      fs.writeFile('../contracts/interfaces/IVerifier.sol', iVerifier, 'utf8',(err)=> {
+        if (err) throw err;
+      })
+      fs.writeFile('../contracts/interfaces/IdUtility.sol', idUtility, 'utf8',(err)=> {
+        if (err) throw err;
+      })
+      fs.writeFile('../contracts/dUtility.sol', dUtility, 'utf8',(err)=> {
+        if (err) throw err;
+      })
+
+    }
+
+    console.log("Generating the corresponding Solidity Contracts...")
+    generateContracts(wE, nE);
+    console.log("Saving the generated code to the corresponding Solidity-Contract Files...")
 
     console.log("Saving the generated code to the ned-server-config.js File...")
     fs.writeFile('../ned-server-config.js', code2, 'utf8',(err)=> {
