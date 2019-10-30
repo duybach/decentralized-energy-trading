@@ -72,6 +72,12 @@ module.exports = {
       .join(" ");
 
     process.stdout.write("Computing witness...");
+
+    console.log("balancesWithEnergyBefore: ", balancesWithEnergyBefore);
+    console.log("balancesNoEnergyBefore: ", balancesNoEnergyBefore);
+    console.log("balancesWithEnergyAfter: ", balancesWithEnergyAfter);
+    console.log("balancesNoEnergyAfter: ", balancesNoEnergyAfter);
+
     const witnessShellStr = shell
       .exec(
         `zokrates compute-witness -a ${balancesWithEnergyBefore} ${balancesNoEnergyBefore} ${balancesWithEnergyAfter} ${balancesNoEnergyAfter} ${packedParams} > /dev/null`

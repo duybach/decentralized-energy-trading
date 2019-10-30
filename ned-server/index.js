@@ -87,6 +87,12 @@ async function init() {
         config.password,
         null
       );
+
+      console.log("Proof A: ",proof.a);
+      console.log("Proof B: ",proof.b);
+      console.log("Proof C: ",proof.c);
+      console.log("Inputs: ",inputs);
+
       utilityContract.methods
         .verifyNetting(proof.a, proof.b, proof.c, inputs)
         .send({ from: config.address }, (error, txHash) => {
@@ -107,13 +113,23 @@ async function init() {
     utilityAfterNetting.settle();
     const hhWithEnergy = serverConfig.hhProduce;
     const hhNoEnergy = serverConfig.hhConsume;
+    
     const hhAddressToHash = zkHandler.generateProof(
       utilityBeforeNetting,
       utilityAfterNetting,
       hhWithEnergy,
       hhNoEnergy
     );
-    delete hhAddressToHash[ZERO_ADDRESS];
+
+    //delete hhAddressToHash[ZERO_ADDRESS];
+
+    if(!!utilityAfterNetting.households[config.address] && !!utilityAfterNetting.households[ZERO_ADDRESS]){
+      delete utilityAfterNetting.households[ZERO_ADDRESS];
+    }
+
+    console.log("Utility Before Netting: ", utilityBeforeNetting);
+    console.log("Utility After Netting: ", utilityAfterNetting);
+
     if (Object.keys(hhAddressToHash).length > 0) {
       await web3.eth.personal.unlockAccount(
         config.address,
