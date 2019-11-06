@@ -5,7 +5,7 @@ function generateHelperFuncs(wE, nE) {
   console.log("# of HHs with Energy: ", wE);
   console.log("# of HHs without Energy: ", nE);
 
-    return `//The comments and explanations are provided for an example with n = 4 households!
+    return `//The comments and explanations are provided for an example with n households!
 
 import "hashes/sha256/512bitPacked.code" as sha256packed
 
@@ -14,7 +14,7 @@ import "hashes/sha256/512bitPacked.code" as sha256packed
 // @returns {field} energy of provided households
 def energyOfWE(field[${wE}] hh) -> (field):
   field energy = 0
-  for field i in 0..${wE - 1} do
+  for field i in 0..${wE} do
     energy = energy + hh[i]
   endfor
   return energy
@@ -24,7 +24,7 @@ def energyOfWE(field[${wE}] hh) -> (field):
 // @returns {field} energy of provided households
 def energyOfNE(field[${nE}] hh) -> (field):
   field energy = 0
-  for field i in 0..${nE - 1} do
+  for field i in 0..${nE} do
     energy = energy + hh[i]
   endfor
   return energy
@@ -56,7 +56,7 @@ def deltaNetWE(field[${wE}] hh, field[${wE}] hhNet) -> (field):
 // @returns {field} delta
 def deltaNetNE(field[${nE}] hh, field[${nE}] hhNet) -> (field):
   field delta = 0
-  for field i in 0..${nE - 1} do
+  for field i in 0..${nE} do
     delta = delta + (hh[i] - hhNet[i])
   endfor
   return delta
@@ -78,7 +78,7 @@ def validateFairnessWE(field[${wE}] hh, field[${wE}] hhNet) -> (field):
 // @returns {field} errorCounter
 def validateFairnessNE(field[${nE}] hh, field[${nE}] hhNet) -> (field):
   field errorCounter = 0
-  for field i in 0..${nE - 1} do
+  for field i in 0..${nE} do
     errorCounter = errorCounter + if hhNet[i] > hh[i] then 1 else 0 fi
   endfor
   return errorCounter
@@ -90,7 +90,7 @@ def validateFairnessNE(field[${nE}] hh, field[${nE}] hhNet) -> (field):
 // @param epsilon the error tolerance value
 def validateZeroNetWE(field[${wE}] hh, field epsilon) -> (field):
   field errorCounter = 0
-  for field i in 0..${wE - 1} do
+  for field i in 0..${wE} do
     errorCounter = errorCounter + if hh[i] > epsilon then 1 else 0 fi
   endfor
   return errorCounter
@@ -102,7 +102,7 @@ def validateZeroNetWE(field[${wE}] hh, field epsilon) -> (field):
 // @param epsilon the error tolerance value
 def validateZeroNetNE(field[${nE}] hh, field epsilon) -> (field):
   field errorCounter = 0
-  for field i in 0..${nE - 1} do
+  for field i in 0..${nE} do
     errorCounter = errorCounter + if hh[i] > epsilon then 1 else 0 fi
   endfor
   return errorCounter
@@ -112,7 +112,7 @@ def validateZeroNetNE(field[${nE}] hh, field epsilon) -> (field):
 // @returns (field) energy of provided households
 def sumWE(field[${wE}] hh) -> (field):
   field s = 0
-  for field i in 0..${wE - 1} do
+  for field i in 0..${wE} do
     s = s + hh[i]
   endfor
   return s
@@ -122,7 +122,7 @@ def sumWE(field[${wE}] hh) -> (field):
 // @returns (field) energy of provided households
 def sumNE(field[${nE}] hh) -> (field):
   field s = 0
-  for field i in 0..${nE - 1} do
+  for field i in 0..${nE} do
     s = s + hh[i]
   endfor
   return s
@@ -134,7 +134,7 @@ def sumNE(field[${nE}] hh) -> (field):
     let energySumStringWE = "  field energySumWE = hhWithEnergy[0] + hhWithEnergyNet[0]";
     let energySumStringNE = "  field energySumNE = hhNoEnergy[0] + hhNoEnergyNet[0]";
     let packedString = "";
-    let returnSignatureString = Array((wE + nE) + 1)
+    let returnSignatureString = Array((wE + nE))
       .fill("field[2]", 0, (wE + nE) + 1)
       .join(",");
     let returnString = " return ";
@@ -160,22 +160,9 @@ def sumNE(field[${nE}] hh) -> (field):
       energySumStringNE += ` + hhNoEnergy[${i}] + hhNoEnergyNet[${i}]`;
     }
 
+    /*
     for (let i = 0; i < wE; i++) {
-      if (i % 5 === 0) {/*
-        const j = i / 5 + 1;
-        if(uBound == wE){
-          energySumString += `+ hhWithEnergy[${i}] + hhWithEnergyNet[${i}]`;
-        }else{
-          energySumString += `hhNoEnergy[${i}] + hhNoEnergyNet[${i}]`;
-        }
-        for (let k = 0; k < lBound; k++) {
-          if(lBound == nE){
-            energySumString += ` + hhNoEnergy[${k}] + hhNoEnergyNet[${k}]`;
-          }else{
-            energySumString += ` + hhWithEnergy[${k}] + hhWithEnergyNet[${k}]`;
-          }
-        }*/
-      }
+      
       packedString += `  hh${i +
         1}WithEnergyHash = sha256packed([hhWithEnergyPacked[${i +
         3 * i}], hhWithEnergyPacked[${i + 1 + 3 * i}], hhWithEnergyPacked[${i +
@@ -190,6 +177,18 @@ def sumNE(field[${nE}] hh) -> (field):
         2 +
         3 * i}], hhNoEnergyPacked[${i + 3 + 3 * i}]])\n`;
     }
+    */
+   
+  for (let i = 0; i < wE; i++) {    
+    
+    packedString += `  hh${i +
+      1}WithEnergyHash = sha256packed([0, 0, 0, hhWithEnergyPacked[${i}]])\n`;
+  }
+
+  for(let i = 0; i < nE; i++){
+    packedString += `  hh${i +
+      1}NoEnergyHash = sha256packed([0, 0, 0, hhNoEnergyPacked[${i}]])\n`;
+  }
 
     for(let i = 0; i < wE; i++){
       returnString += ` hh${i + 1}WithEnergyHash,`;
@@ -223,26 +222,31 @@ def sumNE(field[${nE}] hh) -> (field):
 // @param (private field[8]) hhNoEnergyPacked Packed inputs energy + nonce + address of hh with energy deficit
 // Index 0 to 3 are packed inputs of hh1 with energy deficit
 // Index 4 to 7 are packed inputs of hh2 with energy deficit
-// @returns (field[2], field[2], field[2], field[2], field[2]) sha256packed hashes of hhWithEnergyPacked and hhNoEnergyPacked and sha256packed hash that depends on inputs
-def main(private field[${wE}] hhWithEnergy, private field[${nE}] hhNoEnergy, private field[${wE}] hhWithEnergyNet, private field[${nE}] hhNoEnergyNet, private field[${wE * 4}] hhWithEnergyPacked, private field[${nE * 4}] hhNoEnergyPacked) -> (${returnSignatureString}):
+// @returns (field[2], field[2], field[2], field[2], field[2],...) sha256packed hashes of hhWithEnergyPacked and hhNoEnergyPacked and sha256packed hash that depends on inputs
+def main(private field[${wE}] hhWithEnergy, private field[${nE}] hhNoEnergy, private field[${wE}] hhWithEnergyNet, private field[${nE}] hhNoEnergyNet, private field[${wE}] hhWithEnergyPacked, private field[${nE}] hhNoEnergyPacked) -> (${returnSignatureString}):
   totalEnergy = calculateTotalEnergy(hhWithEnergy, hhNoEnergy)
   totalEnergyNet = calculateTotalEnergy(hhWithEnergyNet, hhNoEnergyNet)
   totalEnergy == totalEnergyNet
+
   deltaNetWithEnergy = deltaNetWE(hhWithEnergy, hhWithEnergyNet)
   deltaNetNoEnergy = deltaNetNE(hhNoEnergy, hhNoEnergyNet)
   deltaNetWithEnergy == deltaNetNoEnergy
+
   0 == validateFairnessWE(hhWithEnergy, hhWithEnergyNet)
   0 == validateFairnessNE(hhNoEnergy, hhNoEnergyNet)
+
   field sumWithEnergy = sumWE(hhWithEnergyNet)
   field sumNoEnergy = sumNE(hhNoEnergyNet)
+
   field[${wE}] zeroNetPartyWE = hhWithEnergyNet
   field[${nE}] zeroNetPartyNE = hhNoEnergyNet
+
   0 == if sumWithEnergy <= sumNoEnergy then validateZeroNetWE(zeroNetPartyWE, 15) else validateZeroNetNE(zeroNetPartyNE, 15) fi// Can make epsilon more accurate in the future
-${energySumStringWE}
-${energySumStringNE}
-  field energySum = energySumWE + energySumNE
-  h = sha256packed([0, 0, 0, energySum])
-${packedString} ${returnString} h
+  //${energySumStringWE}
+  //${energySumStringNE}
+  //field energySum = energySumWE + energySumNE
+  //h = sha256packed([0, 0, 0, energySum])
+${packedString} ${returnString.slice(0, -1)} //h
 `;
   }
 
