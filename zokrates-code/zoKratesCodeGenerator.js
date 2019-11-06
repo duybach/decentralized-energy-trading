@@ -307,7 +307,7 @@ ${packedString} ${returnString.slice(0, -1)} //h
     })
 
     function generateContracts(wE, nE){
-      let len = (wE+nE) * 2 + 2;
+      let len = (wE+nE) * 2;
 
       iVerifier = `
 pragma solidity >=0.5.0 <0.6.0;
