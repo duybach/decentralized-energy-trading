@@ -479,7 +479,7 @@ contract dUtility is Mortal, IdUtility {
     uint256[2] memory _a,
     uint256[2][2] memory _b,
     uint256[2] memory _c,
-    uint256[8] memory _input) private returns (bool success) {
+    uint256[${len}] memory _input) private returns (bool success) {
     success = verifier.verifyTx(_a, _b, _c, _input);
     if (success) {
       uint256 record = block.number;
@@ -525,7 +525,7 @@ contract dUtility is Mortal, IdUtility {
   }
 
   function checkNetting(
-    address[] calldata _households, bytes32[] calldata _householdEnergyHashes, uint256[2] calldata _a, uint256[2][2] calldata _b, uint256[2] calldata _c, uint256[8] calldata _input)
+    address[] calldata _households, bytes32[] calldata _householdEnergyHashes, uint256[2] calldata _a, uint256[2][2] calldata _b, uint256[2] calldata _c, uint256[${len}] calldata _input)
     external returns (bool){
     require(_checkHashes(_households, _householdEnergyHashes) == true, "Hashes not matching!");
     require(_verifyNetting(_a, _b, _c, _input) == true, "Netting proof failed!");
