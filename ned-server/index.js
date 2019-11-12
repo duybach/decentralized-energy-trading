@@ -3,7 +3,7 @@ const cors = require("cors");
 const commander = require("commander");
 const web3Utils = require("web3-utils");
 const shell = require("shelljs");
-
+const fs = require('fs');
 const Utility = require("../utility-js/Utility");
 const hhHandler = require("./household-handler");
 const zkHandler = require("./zk-handler");
@@ -70,43 +70,18 @@ async function init() {
     }
   );
 
-  utilityContract.events.CheckHashesSuccess(
-    {
-      fromBlock: latestBlockNumber
-    },
+  utilityContract.events.ShowInput(
     async (error, event) => {
       if (error) {
         console.error(error.msg);
         throw error;
       }
-      console.log("CheckHashesSuccess event", event);
-      latestBlockNumber = event.blockNumber;
-      const { proof, inputs } = require("../zokrates-code/proof.json");
-      await web3.eth.personal.unlockAccount(
-        config.address,
-        config.password,
-        null
-      );
-
-      console.log("Proof A: ",proof.a);
-      console.log("Proof B: ",proof.b);
-      console.log("Proof C: ",proof.c);
-      console.log("Inputs: ",inputs);
-
-      utilityContract.methods
-        .verifyNetting(proof.a, proof.b, proof.c, inputs)
-        .send({ from: config.address }, (error, txHash) => {
-          if (error) {
-            console.error(error);
-            throw error;
-          }
-          console.log("dUtility.verifyNetting txHash", txHash);
-        });
+      console.log("Showing input event", event);
     }
   );
 
   async function runZokrates() {
-    const utilityBeforeNetting = { ...utility };
+    let utilityBeforeNetting = { ...utility };
     Object.setPrototypeOf(utilityBeforeNetting, Utility.prototype);
     utilityAfterNetting = { ...utility };
     Object.setPrototypeOf(utilityAfterNetting, Utility.prototype);
@@ -114,22 +89,17 @@ async function init() {
     const hhWithEnergy = serverConfig.hhProduce;
     const hhNoEnergy = serverConfig.hhConsume;
     
-    const hhAddressToHash = zkHandler.generateProof(
+    let hhAddressToHash = zkHandler.generateProof(
       utilityBeforeNetting,
       utilityAfterNetting,
       hhWithEnergy,
       hhNoEnergy
     );
+    
+    delete hhAddressToHash[ZERO_ADDRESS];
 
-    //delete hhAddressToHash[ZERO_ADDRESS];
-
-    if(!!utilityAfterNetting.households[config.address] && !!utilityAfterNetting.households[ZERO_ADDRESS]){
-      delete utilityAfterNetting.households[ZERO_ADDRESS];
-    }
-
-    console.log("Utility Before Netting: ", utilityBeforeNetting);
-    console.log("Utility After Netting: ", utilityAfterNetting);
-
+    let rawdata = fs.readFileSync('../zokrates-code/proof.json');
+    let data = JSON.parse(rawdata);
     if (Object.keys(hhAddressToHash).length > 0) {
       await web3.eth.personal.unlockAccount(
         config.address,
@@ -138,16 +108,18 @@ async function init() {
       );
       console.log(`Hashes: ${JSON.stringify(hhAddressToHash)}`);
       utilityContract.methods
-        .checkHashes(
+        .checkNetting(
           Object.keys(hhAddressToHash),
-          Object.values(hhAddressToHash)
+          data.proof.a, 
+          data.proof.b, 
+          data.proof.c, 
+          data.inputs
         )
         .send({ from: config.address }, (error, txHash) => {
           if (error) {
             console.error(error.message);
             throw error;
           }
-          console.log("dUtility.checkHashes txHash", txHash);
           console.log(`Sleep for ${config.nettingInterval}ms ...`);
           setTimeout(() => {
             runZokrates();
@@ -182,9 +154,9 @@ app.put("/energy/:householdAddress", async (req, res) => {
     const householdAddress = web3Utils.toChecksumAddress(
       req.params.householdAddress
     );
-    const { signature, hash, timestamp, meterReading } = req.body;
+    const { signature, hash, timestamp, meterDelta } = req.body;
 
-    if (typeof meterReading !== "number") {
+    if (typeof meterDelta !== "number") {
       throw new Error("Invalid payload");
     }
 
@@ -209,9 +181,9 @@ app.put("/energy/:householdAddress", async (req, res) => {
       console.log(`New household ${householdAddress} added`);
     }
     console.log(
-      `Incoming meter reading for ${householdAddress}: ${meterReading}@${timestamp}`
+      `Incoming meter reading for ${householdAddress}: ${meterDelta}@${timestamp}`
     );
-    utility.updateMeterReading(householdAddress, meterReading, timestamp);
+    utility.updateMeterDelta(householdAddress, meterDelta, timestamp);
 
     res.status(200);
     res.send();

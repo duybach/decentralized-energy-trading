@@ -54,30 +54,18 @@ module.exports = {
 
     const packedParams = hhAddresses
       .map(address => {
-        const packedParamsOfHH = zokratesHelper.padPackParams512(
-          conversionHelper.kWhToWs(
-            // TODO: Handle negative meter readings
-            Math.abs(utilityBeforeNetting.households[address].meterReading)
-          ),
-          utilityBeforeNetting.households[address].lastUpdate,
-          address.toLowerCase()
-        );
-        return [
-          web3Utils.hexToNumberString(packedParamsOfHH.substr(2, 32)),
-          web3Utils.hexToNumberString(packedParamsOfHH.substr(34, 3)),
-          web3Utils.hexToNumberString(packedParamsOfHH.substr(66, 32)),
-          web3Utils.hexToNumberString(packedParamsOfHH.substr(98, 32))
-        ].join(" ");
+        return web3Utils.hexToNumber(
+          zokratesHelper.padPackParams256(
+            conversionHelper.kWhToWs(
+              // TODO: Handle negative meter readings
+              Math.abs(utilityBeforeNetting.households[address].meterDelta)
+            )
+          )
+        )
       })
       .join(" ");
 
     process.stdout.write("Computing witness...");
-
-    console.log("balancesWithEnergyBefore: ", balancesWithEnergyBefore);
-    console.log("balancesNoEnergyBefore: ", balancesNoEnergyBefore);
-    console.log("balancesWithEnergyAfter: ", balancesWithEnergyAfter);
-    console.log("balancesNoEnergyAfter: ", balancesNoEnergyAfter);
-
     const witnessShellStr = shell
       .exec(
         `zokrates compute-witness -a ${balancesWithEnergyBefore} ${balancesNoEnergyBefore} ${balancesWithEnergyAfter} ${balancesNoEnergyAfter} ${packedParams} > /dev/null`
