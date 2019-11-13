@@ -181,13 +181,13 @@ def sumNE(field[${nE}] hh) -> (field):
    
   for (let i = 0; i < wE; i++) {    
     
-    packedString += `  hh${i +
-      1}WithEnergyHash = sha256packed([0, 0, 0, hhWithEnergyPacked[${i}]])\n`;
+    packedString += `  field[2] hh${i +
+      1}WithEnergyHash = if hhWithEnergyPacked[${i}] == 0 then [0, 0] else sha256packed([0, 0, 0, hhWithEnergyPacked[${i}]]) fi\n`;
   }
 
   for(let i = 0; i < nE; i++){
-    packedString += `  hh${i +
-      1}NoEnergyHash = sha256packed([0, 0, 0, hhNoEnergyPacked[${i}]])\n`;
+    packedString += `  field[2] hh${i +
+      1}NoEnergyHash = if hhNoEnergyPacked[${i}] == 0 then [0, 0] else sha256packed([0, 0, 0, hhNoEnergyPacked[${i}]]) fi\n`;
   }
 
     for(let i = 0; i < wE; i++){
@@ -341,6 +341,8 @@ contract IdUtility {
 
   event NonRenewableEnergyChanged(address indexed household, bytes32 newDeltaEnergy);
   event ShowInput(bytes32[] indexed household);
+
+  event TestingNettingFunction(uint256 step);
 
   /* Household management */
   function addHousehold(address _household) external returns (bool);
@@ -539,7 +541,7 @@ contract dUtility is Mortal, IdUtility {
     ) external returns (bool){
     // Ensure that all households that reported meter_delta !=0 in the netting reported are represented in both, addresslist and hashlist sent to SC
     // require address.len == hash_not_0.len / 2 where hash_not_0 is hashes recreated from _input that are not 0.
-
+    emit TestingNettingSuccess(1);
     // To evaluate the _input hashes, we need to loop through the addresslist provided with the proof and check whether the SC hash registry has values
     require(_checkHashes(_households, _input) == true, "Hashes not matching!");
     require(_verifyNetting(_a, _b, _c, _input) == true, "Netting proof failed!");
