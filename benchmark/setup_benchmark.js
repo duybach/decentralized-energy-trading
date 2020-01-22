@@ -43,7 +43,7 @@ function setupBenchmark() {
             timestamp
         });
 
-        await web3.eth.personal.unlockAccount(address, password, null);
+        await web3Helper.unlockAccount(web3, config.network, address, password)
         web3.eth.defaultAccount = address;
 
         dUtility.methods.setupBenchmark(getContractAddresses().verifier, hhAddresses, convertHHDeltas(meterDeltas)).send({

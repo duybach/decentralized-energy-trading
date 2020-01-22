@@ -27,12 +27,12 @@ module.exports = {
    * @param {number} meterDelta Current meter change in kWh.
    */
   putMeterReading: async (config, web3, utilityContract, meterDelta) => {
-    const { address, password } = config;
+    const { address, password, network } = config;
     const timestamp = Date.now();
 
     const hash = zokratesHelper.packAndHash(meterDelta);
 
-    await web3.eth.personal.unlockAccount(address, password, null);
+    await web3Helper.unlockAccount(web3, network, address, password);
     utilityContract.methods
       .updateRenewableEnergy(address, web3Utils.hexToBytes(hash))
       .send({ from: address }, (error, txHash) => {

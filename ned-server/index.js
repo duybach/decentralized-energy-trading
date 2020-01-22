@@ -92,11 +92,7 @@ async function init() {
     let rawdata = fs.readFileSync("../zokrates-code/proof.json");
     let data = JSON.parse(rawdata);
     if (hhAddresses.length > 0) {
-      await web3.eth.personal.unlockAccount(
-        config.address,
-        config.password,
-        null
-      );
+      await web3Helper.unlockAccount(web3, config.network, config.address, config.password);
       utilityContract.methods
         .checkNetting(
           hhAddresses,

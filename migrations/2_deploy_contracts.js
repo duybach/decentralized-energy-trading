@@ -20,7 +20,7 @@ const options = { resolveWithFullResponse: true };
 
 async function addValidator(validator, ownedSetInstance, web3) {
   process.stdout.write(`  Adding ${validator} to OwnedSet contract ... `);
-  await web3.eth.personal.unlockAccount(address, password, null);
+  await web3Helper.unlockAccount(web3, "authority", address, password)
   await ownedSetInstance.addValidator(validator, {
     from: AUTHORITY_ADDRESS
   });
@@ -29,7 +29,7 @@ async function addValidator(validator, ownedSetInstance, web3) {
 
 async function finalizeChange(ownedSetInstance, web3) {
   process.stdout.write(`  Finalizing changes to OwnedSet contract ... `);
-  await web3.eth.personal.unlockAccount(address, password, null);
+  await web3Helper.unlockAccount(web3, "authority", address, password)
   await ownedSetInstance.finalizeChange();
   process.stdout.write(chalk.green("done\n"));
 }
@@ -68,21 +68,21 @@ module.exports = async (deployer, network, [authority]) => {
       const web3 = web3Helper.initWeb3("authority");
 
       process.stdout.write("  Set verifier contract address ... ");
-      await web3.eth.personal.unlockAccount(address, password, null);
+      await web3Helper.unlockAccount(web3, network, address, password)
       await utilityInstanceInAuthority.setVerifier(VERIFIER_ADDRESS, {
         from: AUTHORITY_ADDRESS
       });
       process.stdout.write(chalk.green("done\n"));
 
       process.stdout.write("  Adding admin node to Utility contract ... ");
-      await web3.eth.personal.unlockAccount(address, password, null);
+      await web3Helper.unlockAccount(web3, network, address, password)
       await utilityInstanceInAuthority.addHousehold(AUTHORITY_ADDRESS, {
         from: AUTHORITY_ADDRESS
       });
       process.stdout.write(chalk.green("done\n"));
 
       process.stdout.write("  Transfer ownership of Utility contract ... ");
-      await web3.eth.personal.unlockAccount(address, password, null);
+      await web3Helper.unlockAccount(web3, network, address, password)
       await utilityInstanceInAuthority.transferOwnership(OWNED_SET_ADDRESS, {
         from: AUTHORITY_ADDRESS
       });
@@ -91,7 +91,7 @@ module.exports = async (deployer, network, [authority]) => {
       process.stdout.write("  Adding authority addresses ...\n");
       await asyncUtils.asyncForEach(OTHER_AUTHORITY_ADDRESSES, async a => {
         await addValidator(a, ownedSetInstanceInAuthority, web3);
-        await web3.eth.personal.unlockAccount(address, password, null);
+        await web3Helper.unlockAccount(web3, network, address, password)
         process.stdout.write(
           `Sending ether from ${AUTHORITY_ADDRESS} to ${a} ...`
         );
@@ -111,29 +111,29 @@ module.exports = async (deployer, network, [authority]) => {
       await finalizeChange(ownedSetInstanceInAuthority, web3);
 
       process.stdout.write("  Removing 'fake' authority addresses ...");
-      await web3.eth.personal.unlockAccount(address, password, null);
+      await web3Helper.unlockAccount(web3, network, address, password)
       await ownedSetInstanceInAuthority.removeValidator(TESTS_FAKE_ADDRESS, {
         from: AUTHORITY_ADDRESS
       });
       process.stdout.write(chalk.green("done\n"));
       await finalizeChange(ownedSetInstanceInAuthority, web3);
-      await web3.eth.personal.unlockAccount(address, password, null);
+      await web3Helper.unlockAccount(web3, network, address, password)
       break;
     }
     case "benchmark": {
       const web3 = web3Helper.initWeb3("benchmark");
-      await web3.eth.personal.unlockAccount(address, password, null);
+      await web3Helper.unlockAccount(web3, network, address, password)
       const contractAddress = await deployer.deploy(dUtilityBenchmark)
         .then(inst => {
           return inst.address;
         });
 
-      await web3.eth.personal.unlockAccount(address, password, null);
+      await web3Helper.unlockAccount(web3, network, address, password)
       const verifierAddress = await deployer.deploy(verifier, { gas: 20000000})
         .then(inst => {
           return inst.address;
         });
-      await web3.eth.personal.unlockAccount(address, password, null);
+      await web3Helper.unlockAccount(web3, network, address, password)
       fs.writeFile('tmp/addresses.txt', JSON.stringify({contract: contractAddress, verifier: verifierAddress}),
         function (err) {
           if (err) throw err;

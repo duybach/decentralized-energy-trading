@@ -28,6 +28,24 @@ module.exports = {
     };
   },
   /**
+  * unlocks account
+  * @param {Object} web3 Web3 instance.
+  * @param {string} network name of used network
+  * @param {string} address account address
+  * @param {string} password Password to unlock signer.
+  */
+  unlockAccount: async(web3, network, address, password) => {
+    //no need to unlock when using ganache
+    if (`${network}` !== "ganache"){
+      await web3.eth.personal.unlockAccount(
+        address,
+        password,
+        null
+      );
+    }
+   
+  },
+  /**
    * Verifies if signature is valid.
    * @param {Object} web3 Web3 instance.
    * @param {any} data Signed data.

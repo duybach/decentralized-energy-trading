@@ -201,7 +201,6 @@ app.put("/sensor-stats", async (req, res) => {
         meterDelta
       );
     }
-
     await db.writeToDB(
       config.dbUrl,
       config.dbName,
@@ -218,7 +217,7 @@ app.put("/sensor-stats", async (req, res) => {
     res.status(200);
     res.send();
   } catch (err) {
-    console.error("GET /sensor-stats", err.message);
+    console.error("PUT /sensor-stats", err);
     res.status(500);
     res.send(err);
   }
