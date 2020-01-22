@@ -2,7 +2,7 @@ const UtilityArtifact = require("../build/contracts/Utility.json");
 const dUtilityArtifact = require("../build/contracts/dUtility.json");
 const OwnedSet = require("../build/contracts/OwnedSet.json");
 const { UTILITY_ADDRESS, OWNED_SET_ADDRESS } = require("../helpers/constants");
-
+const fs = require('fs');
 /**
  * Maps contract name to hard coded address in authority setup and truffle artifact.
  */
@@ -35,11 +35,17 @@ module.exports = {
   getDeployedAddress: (contractName, networkId = 8995) => {
     const networkIdString = `${networkId}`;
     const contract = CONTRACTS_MAP[contractName];
-
     // NOTE: 8995 is the id of an authority network. As the address is defined via the
     //       chain spec we return the hard coded address.
     if (networkIdString === "8995") {
       return contract.addressInAuthority;
+    } else if (networkIdString === "1234"){
+      return JSON.parse(fs.readFileSync('tmp/addresses.txt', 'utf8', function (err, data) {
+        if (err) {
+          throw err;
+        }
+        return data
+      })).contract
     } else {
       const networkIds = Object.keys(contract.artifact.networks);
       if (networkIds.indexOf(networkIdString) === -1) {
