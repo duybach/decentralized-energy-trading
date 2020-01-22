@@ -73,6 +73,7 @@ async function runZokrates() {
   let data = JSON.parse(rawdata);
   if (Object.keys(hhAddressToHash).length > 0) {
     //sometimes causes unlocking error when importing password and address via config file. No idea why
+    await web3Helper.unlockAccount(web3, "authority", address, password)
     await web3.eth.personal.unlockAccount(
       "0x00bd138abd70e2f00903268f3db08f2d25677c9e",
       "node0",
