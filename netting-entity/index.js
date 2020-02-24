@@ -4,6 +4,7 @@ const commander = require("commander");
 const web3Utils = require("web3-utils");
 const shell = require("shelljs");
 const fs = require("fs");
+const grpc = require('grpc');
 const Utility = require("./utility");
 const hhHandler = require("./household-handler");
 const zkHandler = require("./zk-handler");
@@ -20,7 +21,13 @@ commander
   .option(
     "-n, --network <type>",
     "network name specified in truffle-config.js"
-  );
+  )
+  .option("-s, --pathssl <type>", "path to tls.cert for LND node")
+  .option(
+      "-m, --pathmacaroon <type>",
+      "path to admin.macaroon for LND node"
+  )
+  .option("-l, --portlnd <type>", "port of lnd server");
 commander.parse(process.argv);
 
 const config = {
@@ -29,7 +36,10 @@ const config = {
   port: commander.port || serverConfig.port,
   network: commander.network || serverConfig.network,
   address: serverConfig.address,
-  password: serverConfig.password
+  password: serverConfig.password,
+  portlnd: commander.portlnd || serverConfig.portlnd,
+  pathssl: commander.pathssl || serverConfig.pathssl,
+  pathmacaroon: commander.pathmacaroon || serverConfig.pathmacaroon
 };
 
 let web3;
@@ -40,10 +50,20 @@ let utilityAfterNetting;
 let ownedSetContract;
 let utilityContract;
 let latestBlockNumber;
+let lnrpc;
+let lndCert;
+let sslCreds;
+let macaroonCreds;
+let macaroon;
+let metadata;
+let creds;
+let lightning;
+let request;
 
 async function init() {
   web3 = web3Helper.initWeb3(config.network);
   latestBlockNumber = await web3.eth.getBlockNumber();
+
   // Off-chain utility instance
   utility = new Utility();
   utilityContract = new web3.eth.Contract(
@@ -54,6 +74,9 @@ async function init() {
     contractHelper.getAbi("ownedSet"),
     contractHelper.getDeployedAddress("ownedSet", await web3.eth.net.getId())
   );
+
+  lightning = lndHandler();
+
   shell.cd("zokrates-code");
 
   utilityContract.events.NettingSuccess(
@@ -123,6 +146,8 @@ async function init() {
   setTimeout(() => {
     runZokrates();
   }, config.nettingInterval);
+
+  shell.cd("..");
 }
 
 init();
@@ -131,6 +156,52 @@ const app = express();
 
 app.use(express.json());
 app.use(cors());
+
+function lndHandler() {
+  lnrpc = grpc.load('rpc.proto').lnrpc;
+  lndCert = fs.readFileSync(config.pathssl);
+  sslCreds = grpc.credentials.createSsl(lndCert);
+  macaroonCreds = grpc.credentials.createFromMetadataGenerator(function(args, callback)
+  {
+    macaroon = fs.readFileSync(config.pathmacaroon).toString('hex');
+    metadata = new grpc.Metadata();
+    metadata.add('macaroon', macaroon);
+    callback(null, metadata);
+  });
+  creds = grpc.credentials.combineChannelCredentials(sslCreds, macaroonCreds);
+  return new lnrpc.Lightning('localhost:' + config.portlnd, creds);
+
+  /*
+  request = {};
+
+  let lnd_response;
+
+  lightning.getInfo(request, function(err, response) {
+      console.log(response)
+  });
+  */
+}
+
+/**
+ * GET LND address of server
+ */
+app.get("/lnd/address", (req, res) => {
+  try {
+    res.status(200);
+
+    request = {};
+
+    lightning.getInfo(request, function(err, response) {
+      res.json({
+          address: response
+      });
+    });
+  } catch (err) {
+    console.error("GET /lnd/address", err.message);
+    res.status(400);
+    res.send(err);
+  }
+});
 
 /**
  * PUT /energy/:householdAddress

@@ -15,6 +15,15 @@ tags: []
 
 ## Get started
 
+**0.)** Deploy Netting Entity LND Node:
+
+```bash
+yarn install
+yarn --cwd household-ui/ install
+
+export NETWORK="simnet" && docker volume create simnet_lnd_ned_server && docker-compose run -p 10009:10009 -d --name ned_server --volume simnet_lnd_ned_server:/root/.lnd lnd
+```
+
 **1.)** Install dependencies
 
 ```bash
@@ -47,7 +56,9 @@ yarn migrate-contracts-authority
 **5.)** Start the Netting Entity:
 
 ```bash
-yarn run-netting-entity -i 60000
+docker cp ned_server:/root/.lnd/tls.cert tls.cert && docker cp ned_server:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon
+
+yarn run-netting-entity -i 60000 -l 10009 -s tls.cert -m admin.macaroon -p 8123
 ```
 
 **6.)** Create two databases for both household servers:

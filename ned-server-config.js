@@ -4,6 +4,12 @@
       host: "127.0.0.1",
       // Port on which the ned server should listen
       port: 3005,
+       // Port on which the LND node is
+      portlnd: 10009,
+       // Path to SSL cert for LND node
+      pathssl: "tls.cert",
+       // Path to admin.macaroon for LND node
+      pathmacaroon: "admin.macaroon",
       // Ethereum address of NED node
       address: "0x00bd138abd70e2f00903268f3db08f2d25677c9e",
       // Password to unlock NED node
