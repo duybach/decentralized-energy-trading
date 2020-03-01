@@ -4,7 +4,7 @@ const commander = require("commander");
 const web3Utils = require("web3-utils");
 const shell = require("shelljs");
 const fs = require("fs");
-const grpc = require('grpc');
+const grpc = require("grpc");
 const Utility = require("./utility");
 const hhHandler = require("./household-handler");
 const zkHandler = require("./zk-handler");
@@ -57,12 +57,24 @@ let macaroonCreds;
 let macaroon;
 let metadata;
 let creds;
+let lnd_request;
 let lightning;
-let request;
+let invoiceListener;
 
 async function init() {
   web3 = web3Helper.initWeb3(config.network);
   latestBlockNumber = await web3.eth.getBlockNumber();
+
+  // Init lightning
+  lightning = lndHandler();
+
+  // Listen to incoming invocies
+  invoiceListener = lightning.subscribeInvoices({})
+
+  invoiceListener.on('data', function(response) {
+    // A response was received from the server.
+    console.log(response);
+  });
 
   // Off-chain utility instance
   utility = new Utility();
@@ -74,8 +86,6 @@ async function init() {
     contractHelper.getAbi("ownedSet"),
     contractHelper.getDeployedAddress("ownedSet", await web3.eth.net.getId())
   );
-
-  lightning = lndHandler();
 
   shell.cd("zokrates-code");
 
@@ -172,11 +182,11 @@ function lndHandler() {
   return new lnrpc.Lightning('localhost:' + config.portlnd, creds);
 
   /*
-  request = {};
+  lnd_request = {};
 
   let lnd_response;
 
-  lightning.getInfo(request, function(err, response) {
+  lightning.getInfo(lnd_request, function(err, response) {
       console.log(response)
   });
   */
@@ -189,11 +199,13 @@ app.get("/lnd/address", (req, res) => {
   try {
     res.status(200);
 
-    request = {};
+    lnd_request = {};
 
-    lightning.getInfo(request, function(err, response) {
+    lightning.getInfo(lnd_request, function(err, response) {
       res.json({
-          address: response
+          identity_pubkey: response["identity_pubkey"],
+          host: config.host,
+          port: "9735"
       });
     });
   } catch (err) {

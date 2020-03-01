@@ -1,7 +1,9 @@
 const express = require("express");
 const fs = require("fs");
+const grpc = require("grpc");
 const cors = require("cors");
 const commander = require("commander");
+const byteBuffer = require("bytebuffer");
 const db = require("./apis/db");
 const ned = require("./apis/ned");
 const blockchain = require("./apis/blockchain");
@@ -24,7 +26,13 @@ commander
   .option(
     "-n, --network <type>",
     "network name specified in truffle-config.js"
-  );
+  )
+  .option("-s, --pathSsl <type>", "path to tls.cert for LND node")
+  .option(
+      "-m, --pathMacaroon <type>",
+      "path to admin.macaroon for LND node"
+  )
+  .option("-l, --portLnd <type>", "port of LND server");
 commander.parse(process.argv);
 
 // Configuration wrapper
@@ -39,7 +47,10 @@ const config = {
   dbName: serverConfig.dbName,
   sensorDataCollection: serverConfig.sensorDataCollection,
   utilityDataCollection: serverConfig.utilityDataCollection,
-  meterReadingCollection: serverConfig.meterReadingCollection
+  meterReadingCollection: serverConfig.meterReadingCollection,
+  portLnd: commander.portLnd || serverConfig.portLnd,
+  pathSsl: commander.pathSsl || serverConfig.pathSsl,
+  pathMacaroon: commander.pathMacaroon || serverConfig.pathMacaroon
 };
 
 // Set up the DB
@@ -58,10 +69,68 @@ let web3;
 let utilityContract;
 let latestBlockNumber;
 let nettingActive = false;
+let lnrpc;
+let lndCert;
+let sslCreds;
+let macaroonCreds;
+let macaroon;
+let metadata;
+let creds;
+let options;
+var lightning;
+var ned_server_identity_pubkey;
+var ned_server_lightning_port;
+var ned_server_lightning_host;
 
 async function init() {
   web3 = web3Helper.initWeb3(config.network);
   latestBlockNumber = await web3.eth.getBlockNumber();
+
+  // Init lightning channel to NED server
+  options = {
+    uri: `${config.nedUrl}/lnd/address`,
+    json: true
+  };
+
+  request(options)
+    .then(function (res) {
+      ned_server_identity_pubkey = res["identity_pubkey"];
+      ned_server_lightning_host = res["host"];
+      ned_server_lightning_port = res["port"];
+      console.log("Found identity_pubkey of server: " + ned_server_identity_pubkey);
+
+      lightning = lndHandler();
+
+      console.log(ned_server_identity_pubkey + "" + ned_server_lightning_host + ":" + ned_server_lightning_port);
+
+      var test = new lnrpc.LightningAddress(ned_server_identity_pubkey, ned_server_lightning_host + ":" + ned_server_lightning_port);
+
+      options = {
+        addr: test
+      };
+
+      lightning.connectPeer(options, function(err, res) {
+        console.log(err);
+        console.log(res);
+      });
+
+      options = {
+        node_pubkey: byteBuffer.fromHex(ned_server_identity_pubkey),
+        node_pubkey_string: ned_server_identity_pubkey,
+        local_funding_amount: 1000000,
+        push_sat: 1000
+      };
+
+      lightning.openChannelSync(options, function(err, res) {
+        console.log(err);
+        console.log(res);
+      });
+    })
+    .catch(function (err) {
+      console.log(err);
+    });
+
+
   utilityContract = new web3.eth.Contract(
     contractHelper.getAbi("dUtility"),
     contractHelper.getDeployedAddress("dUtility", await web3.eth.net.getId())
@@ -120,6 +189,30 @@ const app = express();
 
 app.use(express.json());
 app.use(cors());
+
+function lndHandler() {
+  lnrpc = grpc.load('rpc.proto').lnrpc;
+  lndCert = fs.readFileSync(config.pathSsl);
+  sslCreds = grpc.credentials.createSsl(lndCert);
+  macaroonCreds = grpc.credentials.createFromMetadataGenerator(function(args, callback)
+  {
+    macaroon = fs.readFileSync(config.pathMacaroon).toString('hex');
+    metadata = new grpc.Metadata();
+    metadata.add('macaroon', macaroon);
+    callback(null, metadata);
+  });
+  creds = grpc.credentials.combineChannelCredentials(sslCreds, macaroonCreds);
+
+  return new lnrpc.Lightning('localhost:' + config.portLnd, creds);
+
+  request = {};
+
+  let lnd_response;
+
+  lightning.getInfo(request, function(err, response) {
+      console.log(response)
+  });
+}
 
 /**
  * GET /sensor-stats?from=<fromDate>&to=<toDate>

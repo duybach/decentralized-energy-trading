@@ -15,13 +15,20 @@ tags: []
 
 ## Get started
 
-**0.)** Deploy Netting Entity LND Node:
+**0.1.)** Deploy Netting Entity LND Node:
 
 ```bash
-yarn install
-yarn --cwd household-ui/ install
-
 export NETWORK="simnet" && docker volume create simnet_lnd_ned_server && docker-compose run -p 10009:10009 -d --name ned_server --volume simnet_lnd_ned_server:/root/.lnd lnd
+
+docker cp ned_server:/root/.lnd/tls.cert tls.cert && docker cp ned_server:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon
+```
+
+**0.2.)** Deploy Client Entity LND Node:
+
+```bash
+export NETWORK="simnet" && docker volume create simnet_lnd_client && docker-compose run -p 10010:10009 -d --name client --volume simnet_lnd_client:/root/.lnd lnd
+
+docker cp client:/root/.lnd/tls.cert tls.cert && docker cp client:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon
 ```
 
 **1.)** Install dependencies
@@ -58,7 +65,7 @@ yarn migrate-contracts-authority
 ```bash
 docker cp ned_server:/root/.lnd/tls.cert tls.cert && docker cp ned_server:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon
 
-yarn run-netting-entity -i 60000 -l 10009 -s tls.cert -m admin.macaroon -p 8123
+yarn run-netting-entity -i 60000 -l 10009 -s netting-entity/tls.cert -m netting-entity/admin.macaroon -p 8123
 ```
 
 **6.)** Create two databases for both household servers:
@@ -75,7 +82,8 @@ docker-compose -f mongo/docker-compose.yml up -d
 yarn run-server \
   -a 0x00aa39d30f0d20ff03a22ccfc30b7efbfca597c2 \
   -P node1 -n authority_1 \
-  -d mongodb://127.0.0.1:27011
+  -d mongodb://127.0.0.1:27011 \
+  -l 10010 -s household-server/tls.cert -m household-server/admin.macaroon -p 8124
 ```
 
 ```bash

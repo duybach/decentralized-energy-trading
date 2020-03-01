@@ -1,0 +1,70 @@
+{
+  "inputs": [
+    {
+      "name": "producersBeforeNet",
+      "public": false,
+      "type": "array",
+      "components": {
+        "size": 1,
+        "type": "field"
+      }
+    },
+    {
+      "name": "consumersBeforeNet",
+      "public": false,
+      "type": "array",
+      "components": {
+        "size": 1,
+        "type": "field"
+      }
+    },
+    {
+      "name": "producersAfterNet",
+      "public": false,
+      "type": "array",
+      "components": {
+        "size": 1,
+        "type": "field"
+      }
+    },
+    {
+      "name": "consumersAfterNet",
+      "public": false,
+      "type": "array",
+      "components": {
+        "size": 1,
+        "type": "field"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "type": "array",
+      "components": {
+        "size": 2,
+        "type": "field"
+      }
+    },
+    {
+      "type": "array",
+      "components": {
+        "size": 2,
+        "type": "field"
+      }
+    },
+    {
+      "type": "array",
+      "components": {
+        "size": 2,
+        "type": "field"
+      }
+    },
+    {
+      "type": "array",
+      "components": {
+        "size": 2,
+        "type": "field"
+      }
+    }
+  ]
+}
