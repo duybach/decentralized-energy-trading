@@ -18,9 +18,9 @@ tags: []
 **0.1.)** Deploy Netting Entity LND Node:
 
 ```bash
-export NETWORK="simnet" && docker volume create simnet_lnd_ned_server && docker-compose run -p 10009:10009 -d --name ned_server --volume simnet_lnd_ned_server:/root/.lnd lnd
+export NETWORK="simnet" && docker volume create simnet_lnd_ned_server && docker-compose run -p 10009:10009 -p 9735:9735 -d --name ned_server --volume simnet_lnd_ned_server:/root/.lnd lnd
 
-docker cp ned_server:/root/.lnd/tls.cert tls.cert && docker cp ned_server:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon
+sudo docker cp ned_server:/root/.lnd/tls.cert tls.cert && sudo docker cp ned_server:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon
 ```
 
 **0.2.)** Deploy Client Entity LND Node:
@@ -28,7 +28,7 @@ docker cp ned_server:/root/.lnd/tls.cert tls.cert && docker cp ned_server:/root/
 ```bash
 export NETWORK="simnet" && docker volume create simnet_lnd_client && docker-compose run -p 10010:10009 -d --name client --volume simnet_lnd_client:/root/.lnd lnd
 
-docker cp client:/root/.lnd/tls.cert tls.cert && docker cp client:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon
+sudo docker cp client:/root/.lnd/tls.cert tls.cert && sudo docker cp client:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon
 ```
 
 **1.)** Install dependencies
@@ -65,7 +65,7 @@ yarn migrate-contracts-authority
 ```bash
 docker cp ned_server:/root/.lnd/tls.cert tls.cert && docker cp ned_server:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon
 
-yarn run-netting-entity -i 60000 -l 10009 -s netting-entity/tls.cert -m netting-entity/admin.macaroon -p 8123
+yarn run-netting-entity -i 60000 -l 10009 -s netting-entity/tls.cert -m netting-entity/admin.macaroon -p 8123 -a 172.18.0.3
 ```
 
 **6.)** Create two databases for both household servers:
@@ -91,7 +91,8 @@ yarn run-server -p 3002 \
 yarn run-server -p 3003 \
   -a 0x002e28950558fbede1a9675cb113f0bd20912019 \
   -P node2 -n authority_2 \
-  -d mongodb://127.0.0.1:27012
+  -d mongodb://127.0.0.1:27012 \
+  -l 10010 -s household-server/tls.cert -m household-server/admin.macaroon
 ```
 
 **Note:** Depending on your network settings an extra flag `-h 127.0.0.1` could be needed for both households.

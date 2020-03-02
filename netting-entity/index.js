@@ -27,7 +27,8 @@ commander
       "-m, --pathmacaroon <type>",
       "path to admin.macaroon for LND node"
   )
-  .option("-l, --portlnd <type>", "port of lnd server");
+  .option("-l, --portlndgrpc <type>", "port of lnd server for grpc")
+  .option("-a --addresslnd <type>", "address of lnd server for communication");
 commander.parse(process.argv);
 
 const config = {
@@ -37,7 +38,8 @@ const config = {
   network: commander.network || serverConfig.network,
   address: serverConfig.address,
   password: serverConfig.password,
-  portlnd: commander.portlnd || serverConfig.portlnd,
+  portlndgrpc: commander.portlndgrpc || serverConfig.portlndgrpc,
+  addresslnd: commander.addresslnd || serverConfig.addresslnd,
   pathssl: commander.pathssl || serverConfig.pathssl,
   pathmacaroon: commander.pathmacaroon || serverConfig.pathmacaroon
 };
@@ -159,7 +161,7 @@ async function init() {
   setTimeout(() => {
     runZokrates();
   }, config.nettingInterval);
-  
+
   shell.cd("..");
 }
 
@@ -182,7 +184,7 @@ function lndHandler() {
     callback(null, metadata);
   });
   creds = grpc.credentials.combineChannelCredentials(sslCreds, macaroonCreds);
-  return new lnrpc.Lightning('localhost:' + config.portlnd, creds);
+  return new lnrpc.Lightning('localhost:' + config.portlndgrpc, creds);
 
   /*
   lnd_request = {};
@@ -207,7 +209,7 @@ app.get("/lnd/address", (req, res) => {
     lightning.getInfo(lnd_request, function(err, response) {
       res.json({
           identity_pubkey: response["identity_pubkey"],
-          host: config.host,
+          host: config.addresslnd,
           port: "9735"
       });
     });

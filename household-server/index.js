@@ -96,7 +96,7 @@ async function init() {
 
       lightning = lndHandler();
 
-      console.log(ned_server_identity_pubkey + "" + ned_server_lightning_host + ":" + ned_server_lightning_port);
+      console.log(ned_server_identity_pubkey + "@" + ned_server_lightning_host + ":" + ned_server_lightning_port);
 
       var test = new lnrpc.LightningAddress(ned_server_identity_pubkey, ned_server_lightning_host + ":" + ned_server_lightning_port);
 
@@ -107,18 +107,18 @@ async function init() {
       lightning.connectPeer(options, function(err, res) {
         console.log(err);
         console.log(res);
-      });
 
-      options = {
-        node_pubkey: byteBuffer.fromHex(ned_server_identity_pubkey),
-        node_pubkey_string: ned_server_identity_pubkey,
-        local_funding_amount: 1000000,
-        push_sat: 1000
-      };
+        options = {
+          node_pubkey: byteBuffer.fromHex(ned_server_identity_pubkey),
+          node_pubkey_string: ned_server_identity_pubkey,
+          local_funding_amount: 1000000,
+          push_sat: 1000
+        };
 
-      lightning.openChannelSync(options, function(err, res) {
-        console.log(err);
-        console.log(res);
+        lightning.openChannelSync(options, function(err, res) {
+          console.log(err);
+          console.log(res);
+        });
       });
     })
     .catch(function (err) {
@@ -315,7 +315,7 @@ app.put("/sensor-stats", async (req, res) => {
         web3,
         utilityContract,
         meterDelta
-      );
+      );      
     }
 
     await db.writeToDB(
