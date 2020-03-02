@@ -105,6 +105,7 @@ async function init() {
   );
 
   async function runZokrates() {
+    shell.cd("zokrates-code");
     let utilityBeforeNetting = JSON.parse(JSON.stringify(utility)); // dirty hack for obtaining deep copy of utility
     Object.setPrototypeOf(utilityBeforeNetting, Utility.prototype);
     utilityAfterNetting = { ...utility };
@@ -151,12 +152,14 @@ async function init() {
         runZokrates();
       }, config.nettingInterval);
     }
+
+    shell.cd("..");
   }
 
   setTimeout(() => {
     runZokrates();
   }, config.nettingInterval);
-
+  
   shell.cd("..");
 }
 

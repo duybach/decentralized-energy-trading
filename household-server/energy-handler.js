@@ -50,6 +50,8 @@ module.exports = {
       hash
     );
 
+    console.log("Das hier ist wichtig: " + meterDelta);
+
     return ned.putSignedMeterReading(config.nedUrl, address, {
       signature,
       hash,

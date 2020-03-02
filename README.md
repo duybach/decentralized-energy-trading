@@ -79,11 +79,11 @@ docker-compose -f mongo/docker-compose.yml up -d
 
 ```bash
 # Household 1
-yarn run-server \
+yarn run-server -p 3002 \
   -a 0x00aa39d30f0d20ff03a22ccfc30b7efbfca597c2 \
   -P node1 -n authority_1 \
   -d mongodb://127.0.0.1:27011 \
-  -l 10010 -s household-server/tls.cert -m household-server/admin.macaroon -p 8124
+  -l 10010 -s household-server/tls.cert -m household-server/admin.macaroon
 ```
 
 ```bash
