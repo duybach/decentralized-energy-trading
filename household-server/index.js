@@ -111,8 +111,8 @@ async function init() {
         options = {
           node_pubkey: byteBuffer.fromHex(ned_server_identity_pubkey),
           node_pubkey_string: ned_server_identity_pubkey,
-          local_funding_amount: 1000000,
-          push_sat: 1000
+          local_funding_amount: 10000000*1.1,
+          push_sat: 10000000
         };
 
         lightning.openChannelSync(options, function(err, res) {
@@ -310,12 +310,41 @@ app.put("/sensor-stats", async (req, res) => {
 
     if (!nettingActive) {
       nettingActive = true;
+
+      options = {
+        value_msat: Math.abs(meterDelta)
+      };
+
+      lightning.addInvoice(options, function(err, res) {
+        console.log(err)
+        console.log(res['payment_request'])
+
+        const { address, password } = config;
+
+        options = {
+          method: 'PUT',
+          uri: `${config.nedUrl}/lnd/energy/${address}`,
+          body: {
+            invoice: res['payment_request']
+          },
+          json: true
+        };
+
+        request(options)
+          .then(function (res) {
+
+          })
+          .catch(function (err) {
+            console.log(err);
+          });
+      });
+
       await energyHandler.putMeterReading(
         config,
         web3,
         utilityContract,
         meterDelta
-      );      
+      );
     }
 
     await db.writeToDB(

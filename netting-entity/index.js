@@ -62,6 +62,7 @@ let creds;
 let lnd_request;
 let lightning;
 let invoiceListener;
+let options;
 
 async function init() {
   web3 = web3Helper.initWeb3(config.network);
@@ -71,11 +72,20 @@ async function init() {
   lightning = lndHandler();
 
   // Listen to incoming invocies
-  invoiceListener = lightning.subscribeInvoices({})
+  options = {}
+  invoiceListener = lightning.subscribeInvoices(options)
 
   invoiceListener.on('data', function(response) {
     // A response was received from the server.
     console.log(response);
+  });
+
+  invoiceListener.on('status', function(status) {
+    // The current status of the stream.
+    console.log(status);
+  });
+  invoiceListener.on('end', function() {
+    // The server has closed the stream.
   });
 
   // Off-chain utility instance
@@ -215,6 +225,35 @@ app.get("/lnd/address", (req, res) => {
     });
   } catch (err) {
     console.error("GET /lnd/address", err.message);
+    res.status(400);
+    res.send(err);
+  }
+});
+
+/**
+ * PUT /lnd/energy/:householdAddress
+ */
+app.put("/lnd/energy/:householdAddress", async (req, res) => {
+  try {
+    console.log(`Incoming invoice from ${req.params.householdAddress}`)
+
+    const { invoice } = req.body;
+
+    console.log(`Invoice: ${invoice}`)
+
+    options = {
+      payment_request: invoice
+    }
+
+    lightning.sendPaymentSync(options, function(err, res) {
+      console.log(err);
+      console.log(res);
+    })
+
+    res.status(200);
+    res.send();
+  } catch (err) {
+    console.error("PUT /lnd/energy/:householdAddress", err.message);
     res.status(400);
     res.send(err);
   }

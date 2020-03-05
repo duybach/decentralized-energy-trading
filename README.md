@@ -42,6 +42,10 @@ yarn --cwd household-ui/ install
 
 ```bash
 yarn setup-zokrates
+
+# Edit Verifier.sol to verifier.sol
+# Remove "pragma solidity ^0.6.1;"" from verifier.sol file
+
 yarn update-contract-bytecodes
 ```
 
@@ -57,6 +61,7 @@ docker-compose up -d --build
 **4.)** Configure the contracts using truffle migrations:
 
 ```bash
+# Wait a bit before running this command
 yarn migrate-contracts-authority
 ```
 
