@@ -71,23 +71,6 @@ async function init() {
   // Init lightning
   lightning = lndHandler();
 
-  // Listen to incoming invocies
-  options = {}
-  invoiceListener = lightning.subscribeInvoices(options)
-
-  invoiceListener.on('data', function(response) {
-    // A response was received from the server.
-    console.log(response);
-  });
-
-  invoiceListener.on('status', function(status) {
-    // The current status of the stream.
-    console.log(status);
-  });
-  invoiceListener.on('end', function() {
-    // The server has closed the stream.
-  });
-
   // Off-chain utility instance
   utility = new Utility();
   utilityContract = new web3.eth.Contract(
@@ -233,21 +216,22 @@ app.get("/lnd/address", (req, res) => {
 /**
  * PUT /lnd/energy/:householdAddress
  */
-app.put("/lnd/energy/:householdAddress", async (req, res) => {
+app.put("/lnd/energy/:householdAddress", (req, res) => {
   try {
     console.log(`Incoming invoice from ${req.params.householdAddress}`)
 
     const { invoice } = req.body;
-
-    console.log(`Invoice: ${invoice}`)
 
     options = {
       payment_request: invoice
     }
 
     lightning.sendPaymentSync(options, function(err, res) {
-      console.log(err);
-      console.log(res);
+      if (err || res['payment_error']) {
+        console.log('Can\'t pay invoice yet');
+      } else {
+        console.log('Payed invoice');
+      }
     })
 
     res.status(200);

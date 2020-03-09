@@ -68,8 +68,6 @@ yarn migrate-contracts-authority
 **5.)** Start the Netting Entity:
 
 ```bash
-docker cp ned_server:/root/.lnd/tls.cert tls.cert && docker cp ned_server:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon
-
 yarn run-netting-entity -i 60000 -l 10009 -s netting-entity/tls.cert -m netting-entity/admin.macaroon -p 8123 -a 172.18.0.3
 ```
 
@@ -84,7 +82,7 @@ docker-compose -f mongo/docker-compose.yml up -d
 
 ```bash
 # Household 1
-yarn run-server -p 3002 \
+yarn run-server -p 3002 -N http://localhost:8123 \
   -a 0x00aa39d30f0d20ff03a22ccfc30b7efbfca597c2 \
   -P node1 -n authority_1 \
   -d mongodb://127.0.0.1:27011 \
@@ -93,7 +91,7 @@ yarn run-server -p 3002 \
 
 ```bash
 # Household 2
-yarn run-server -p 3003 \
+yarn run-server -p 3003 -N http://localhost:8123 \
   -a 0x002e28950558fbede1a9675cb113f0bd20912019 \
   -P node2 -n authority_2 \
   -d mongodb://127.0.0.1:27012 \

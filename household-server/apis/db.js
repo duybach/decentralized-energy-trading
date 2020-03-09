@@ -24,7 +24,7 @@ module.exports = {
             resolve(db.close());
           });
         })
-      }) 
+      })
       return Promise.all(createPromises)
       .then(() => {
         initializeMeterReading(dbUrl, dbName, "sensor_data", "meter_reading")
@@ -229,7 +229,7 @@ module.exports = {
         dbo
           .collection(collection)
           .findOne(
-            {_id: 1}, 
+            {_id: 1},
             (err, results) => {
               if (err) {
                 reject(err);
