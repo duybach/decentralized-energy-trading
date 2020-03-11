@@ -218,12 +218,12 @@ app.get("/lnd/address", (req, res) => {
  */
 app.put("/lnd/energy/:householdAddress", (req, res) => {
   try {
-    console.log(`Incoming invoice from ${req.params.householdAddress}`)
-
-    const { invoice } = req.body;
+    const { direction, invoice } = req.body;
+    console.log(`Incoming invoice from ${req.params.householdAddress} with direction via ${direction}`);
 
     options = {
-      payment_request: invoice
+      payment_request: invoice,
+      outgoing_chan_id: direction
     }
 
     lightning.sendPaymentSync(options, function(err, res) {

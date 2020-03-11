@@ -75,12 +75,15 @@ let options;
 let remaining_delta;
 let close;
 let channel_point;
+let direction;
 var lightning;
 var ned_server_lightning_address
 var ned_server_identity_pubkey;
 var ned_server_lightning_port;
 var ned_server_lightning_host;
 var call;
+var up_channel;
+var down_channel;
 
 async function init() {
   web3 = web3Helper.initWeb3(config.network);
@@ -196,12 +199,13 @@ function lndInitToNed(ned_server_lightning_address) {
     }
   });
 
-  lndCreateChannel();
+  // lndCreateChannel(true);
+  up_channel = "193010de318c5b9e930310d36c2335d8599cde7a26c8ab16c343c6d1bff90306"
+  // lndCreateChannel(false);
+  down_channel = "6bd36630cd2f179ab79f2dab93fccb035efa3282e0e67020a335988e36c89ed2"
 
   var call = lightning.subscribeInvoices({})
   call.on('data', function(response) {
-    // A response was received from the server.
-
     if (response['settled']) {
       options = {
         active_only: true
@@ -209,15 +213,23 @@ function lndInitToNed(ned_server_lightning_address) {
 
       lightning.listChannels(options, function(err, res) {
         for (let i = 0; i < res['channels'].length; i++) {
-          if (res['channels'][i]['remote_balance'] - res['channels'][i]['remote_chan_reserve_sat'] <= 0) {
-            channel_point = new lnrpc.ChannelPoint();
-            channel_point.funding_txid_bytes = byteBuffer.fromHex(res['channels'][i]['channel_point'].split(":")[0]);
-            channel_point.funding_txid_str = res['channels'][i]['channel_point'].split(":")[0];
-            channel_point.output_index = parseInt(res['channels'][i]['channel_point'].split(":")[1]);
+          if ([up_channel, down_channel].indexOf(res['channels'][i]['channel_point'].split(":")[0] >= 0)) {
+            if (res['channels'][i]['remote_balance'] - res['channels'][i]['remote_chan_reserve_sat'] <= 0) {
+              channel_point = new lnrpc.ChannelPoint();
+              channel_point.funding_txid_bytes = byteBuffer.fromHex(res['channels'][i]['channel_point'].split(":")[0]);
+              channel_point.funding_txid_str = res['channels'][i]['channel_point'].split(":")[0];
+              channel_point.output_index = parseInt(res['channels'][i]['channel_point'].split(":")[1]);
 
-            lndCloseChannel(channel_point);
-
-            lndCreateChannel();
+              if (up_channel == res['channels'][i]['channel_point'].split(":")[0]) {
+                up_channel = null;
+                lndCloseChannel(channel_point);
+                lndCreateChannel(true);
+              } else {
+                down_channel = null;
+                lndCloseChannel(channel_point);
+                lndCreateChannel(false);
+              }
+            }
           }
         }
       });
@@ -225,13 +237,15 @@ function lndInitToNed(ned_server_lightning_address) {
   });
 }
 
-function lndSendMeterDelta(meterDelta) {
+function lndSendMeterDelta(meterDelta, direction) {
   if (meterDelta == 0) {
     return;
   }
 
   options = {
-    value_msat: Math.abs(meterDelta)
+    value_msat: Math.abs(meterDelta),
+    private: true,
+    memo: direction ? 'up' : 'down'
   };
 
   lightning.addInvoice(options, function(err, res) {
@@ -241,32 +255,74 @@ function lndSendMeterDelta(meterDelta) {
 
     lightning.listInvoices(options, function (err, res) {
       console.log(`Invoice queue: ${res['invoices'].length}`)
-      for (let i = 0; i < res['invoices'].length; i++) {
-        const { address, password } = config;
 
-        options = {
-          method: 'PUT',
-          uri: `${config.nedUrl}/lnd/energy/${address}`,
-          body: {
-            invoice: res['invoices'][i]['payment_request']
-          },
-          json: true
-        };
-
-        request(options)
-          .then(function (res) {
-
-          })
-          .catch(function (err) {
-            console.log(err);
-          });
+      options = {
+        active_only: true
       }
+
+      lightning.listChannels(options, function(err, res_lc) {
+        for (let i = 0; i < res['invoices'].length; i++) {
+          const { address, password } = config;
+
+          var target = null;
+          var target_key = res['invoices'][i]['memo'] == 'up' ? up_channel : down_channel;
+
+          for (let i = 0; i < res_lc['channels'].length; i++) {
+            if (res_lc['channels'][i]['channel_point'].split(":")[0] == target_key) {
+              console.log("FOUND CHAN_ID: " + res_lc['channels'][i]['chan_id'])
+              target = res_lc['channels'][i]['chan_id'];
+              break;
+            }
+          }
+
+          if (!target) {
+            console.log('Postponing invoice. ' + res['invoices'][i]['memo'] + ' ' + !target + ' Channel not ready.');
+            continue;
+          }
+
+          if (res['invoices'][i]['memo'] == 'up') {
+            var mic_check = target;
+          } else {
+            var mic_check = target;
+          }
+
+          console.log('Sending invoice ' + res['invoices'][i]['memo'] + ' with chan_id: ' + mic_check);
+
+          options = {
+            method: 'PUT',
+            uri: `${config.nedUrl}/lnd/energy/${address}`,
+            body: {
+              direction: res['invoices'][i]['memo'] == 'up' ? target : target,
+              invoice: res['invoices'][i]['payment_request']
+            },
+            json: true
+          };
+
+          request(options)
+            .then(function (res) {
+
+            })
+            .catch(function (err) {
+              console.log(err);
+            });
+        }
+      });
     });
   });
 }
 
-function lndCreateChannel() {
-  console.log("Creating channel");
+function lndCreateChannel(direction) {
+  if (direction) {
+    if (up_channel) {
+      return;
+    }
+  } else {
+    if (down_channel) {
+      return;
+    }
+  }
+
+  console.log("Trying to create channel");
 
   options = {
     node_pubkey: byteBuffer.fromHex(ned_server_identity_pubkey),
@@ -278,6 +334,23 @@ function lndCreateChannel() {
   };
 
   lightning.openChannelSync(options, function(err, res) {
+    if (err) {
+      console.log(err['details']);
+    } else {
+      if (direction) {
+        if (!up_channel) {
+          up_channel = res['funding_txid_bytes'].reverse().toString('hex');
+
+          console.log("Up channel created with chan_id: " + up_channel);
+        }
+      } else {
+        if (!down_channel) {
+          down_channel = res['funding_txid_bytes'].reverse().toString('hex');
+
+          console.log("Down channel created with chan_id: " + down_channel);
+        }
+      }
+    }
   });
 }
 
@@ -398,30 +471,36 @@ app.put("/sensor-stats", async (req, res) => {
         active_only: true
       };
 
-      let lnd_meterDelta = await db.getMeterReading(config.dbUrl, config.dbName, config.meterReadingCollection, true);
-
       lightning.listChannels(options, function (err, res) {
-        let max = 0;
-        let max_index = 0;
+        let channel_index = null;
+        if (meterDelta >= 0) {
+          direction = true;
+        } else {
+          direction = false;
+        }
 
         for (var i = 0; i < res['channels'].length; i++) {
-            if (res['channels'][i]['remote_balance'] > max) {
-              max = res['channels'][i]['remote_balance'];
-              max_index = i;
+            if ((res['channels'][i]['channel_point'].split(":")[0] == up_channel && meterDelta >= 0) || (res['channels'][i]['channel_point'].split(":")[0] == down_channel && meterDelta < 0)) {
+              channel_index = i;
+              break;
             }
         }
 
-        if (res['channels'].length > 0 && res['channels'][max_index]['remote_balance']*1000 - res['channels'][max_index]['remote_chan_reserve_sat'] * 1000 < Math.abs(meterDelta)) {
-          console.log("Need to reopen " + res['channels'][max_index]['remote_balance']*1000 + " < " + Math.abs(meterDelta));
+        if (channel_index && (res['channels'].length > 0 && res['channels'][channel_index]['remote_balance']*1000 - res['channels'][channel_index]['remote_chan_reserve_sat']*1000 < Math.abs(meterDelta))) {
+          console.log("Need to reopen " + res['channels'][channel_index]['remote_balance']*1000 + " < " + Math.abs(meterDelta));
 
-          remaining_delta = Math.abs(meterDelta) - res['channels'][max_index]['remote_balance']*1000 + res['channels'][max_index]['remote_chan_reserve_sat'] * 1000;
+          remaining_delta = Math.abs(meterDelta) - res['channels'][channel_index]['remote_balance']*1000 + res['channels'][channel_index]['remote_chan_reserve_sat']*1000;
 
-          lndSendMeterDelta(res['channels'][max_index]['remote_balance']*1000 - + res['channels'][max_index]['remote_chan_reserve_sat'] * 1000);
+          lndSendMeterDelta(res['channels'][channel_index]['remote_balance']*1000 - res['channels'][channel_index]['remote_chan_reserve_sat']*1000, direction);
 
           // Transfer remaining
-          lndSendMeterDelta(remaining_delta);
+          lndSendMeterDelta(remaining_delta, direction);
         } else {
-          lndSendMeterDelta(meterDelta);
+          if (channel_index == null) {
+            lndCreateChannel(direction);
+          } else {
+            lndSendMeterDelta(meterDelta, direction);
+          }
         }
       });
 
