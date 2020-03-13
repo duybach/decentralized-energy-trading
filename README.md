@@ -15,20 +15,40 @@ tags: []
 
 ## Get started
 
-**0.1.)** Deploy Netting Entity LND Node:
+**0.1.)** Deploy Netting Entity & Client Entity Node:
 
 ```bash
 export NETWORK="simnet" && docker volume create simnet_lnd_ned_server && docker-compose run -p 10009:10009 -p 9735:9735 -d --name ned_server --volume simnet_lnd_ned_server:/root/.lnd lnd
 
-sudo docker cp ned_server:/root/.lnd/tls.cert tls.cert && sudo docker cp ned_server:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon
-```
-
-**0.2.)** Deploy Client Entity LND Node:
-
-```bash
 export NETWORK="simnet" && docker volume create simnet_lnd_client && docker-compose run -p 10010:10009 -d --name client --volume simnet_lnd_client:/root/.lnd lnd
 
-sudo docker cp client:/root/.lnd/tls.cert tls.cert && sudo docker cp client:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon
+docker exec -i -t client bash
+
+# Generate a new backward compatible nested p2sh address for Alice:
+client$ lncli --network=simnet newaddress np2wkh
+
+# Recreate "btcd" node and set Alice's address as mining address:
+MINING_ADDRESS=<client_address> docker-compose up -d btcd
+
+# Generate 400 blocks (we need at least "100 >=" blocks because of coinbase
+# block maturity and "300 ~=" in order to activate segwit):
+docker exec -it btcd /start-btcctl.sh generate 400
+
+# Check that segwit is active:
+docker exec -it btcd /start-btcctl.sh getblockchaininfo | grep -A 1 segwit
+
+# Check Client balance:
+client$ lncli --network=simnet walletbalance
+```
+
+**0.2.)** Deploy:
+
+```bash
+# Assumes household-server directory
+docker cp client:/root/.lnd/tls.cert tls.cert && docker cp client:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon && chmod -R 775 admin.macaroon
+
+# Assumes netting-server directory
+docker cp ned_server:/root/.lnd/tls.cert tls.cert && docker cp ned_server:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon && chmod -R 775 admin.macaroon
 ```
 
 **1.)** Install dependencies
@@ -61,6 +81,7 @@ docker-compose up -d --build
 **4.)** Configure the contracts using truffle migrations:
 
 ```bash
+# Rename build/Verifier.json to build/verifier.json
 # Wait a bit before running this command
 yarn migrate-contracts-authority
 ```
@@ -68,7 +89,9 @@ yarn migrate-contracts-authority
 **5.)** Start the Netting Entity:
 
 ```bash
-yarn run-netting-entity -i 60000 -l 10009 -s netting-entity/tls.cert -m netting-entity/admin.macaroon -p 8123 -a 172.18.0.3
+docker inspect ned_server | grep "IPAddress"
+
+yarn run-netting-entity -i 60000 -l 10009 -s netting-entity/tls.cert -m netting-entity/admin.macaroon -p 8123 -a <IPAddress>
 ```
 
 **6.)** Create two databases for both household servers:

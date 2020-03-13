@@ -199,10 +199,10 @@ function lndInitToNed(ned_server_lightning_address) {
     }
   });
 
-  // lndCreateChannel(true);
-  up_channel = "193010de318c5b9e930310d36c2335d8599cde7a26c8ab16c343c6d1bff90306"
-  // lndCreateChannel(false);
-  down_channel = "6bd36630cd2f179ab79f2dab93fccb035efa3282e0e67020a335988e36c89ed2"
+  lndCreateChannel(true);
+  // up_channel = "38e1013e7ea9fb7ac816ffa118a3bfd8142778ea56c6f5794c18df56d6ed4a47"
+  lndCreateChannel(false);
+  // down_channel = "bd11e931174ba2d67f59a30ac19e55b90654f8644f4301185ee4e753a9a01e9a"
 
   var call = lightning.subscribeInvoices({})
   call.on('data', function(response) {
@@ -220,14 +220,14 @@ function lndInitToNed(ned_server_lightning_address) {
               channel_point.funding_txid_str = res['channels'][i]['channel_point'].split(":")[0];
               channel_point.output_index = parseInt(res['channels'][i]['channel_point'].split(":")[1]);
 
-              if (up_channel == res['channels'][i]['channel_point'].split(":")[0]) {
+              if (res['channels'][i]['channel_point'].split(":")[0] == up_channel) {
                 up_channel = null;
                 lndCloseChannel(channel_point);
-                lndCreateChannel(true);
-              } else {
+                // lndCreateChannel(true);
+              } else if (res['channels'][i]['channel_point'].split(":")[0] == down_channel) {
                 down_channel = null;
                 lndCloseChannel(channel_point);
-                lndCreateChannel(false);
+                // lndCreateChannel(false);
               }
             }
           }
@@ -269,7 +269,6 @@ function lndSendMeterDelta(meterDelta, direction) {
 
           for (let i = 0; i < res_lc['channels'].length; i++) {
             if (res_lc['channels'][i]['channel_point'].split(":")[0] == target_key) {
-              console.log("FOUND CHAN_ID: " + res_lc['channels'][i]['chan_id'])
               target = res_lc['channels'][i]['chan_id'];
               break;
             }
@@ -329,7 +328,6 @@ function lndCreateChannel(direction) {
     node_pubkey_string: ned_server_identity_pubkey,
     local_funding_amount: 10000000*1.1,
     push_sat: 10000000,
-    private: true,
     sat_per_byte: 0
   };
 
@@ -486,7 +484,7 @@ app.put("/sensor-stats", async (req, res) => {
             }
         }
 
-        if (channel_index && (res['channels'].length > 0 && res['channels'][channel_index]['remote_balance']*1000 - res['channels'][channel_index]['remote_chan_reserve_sat']*1000 < Math.abs(meterDelta))) {
+        if (channel_index != null && (res['channels'].length > 0 && (res['channels'][channel_index]['remote_balance']*1000 - res['channels'][channel_index]['remote_chan_reserve_sat']*1000) < Math.abs(meterDelta))) {
           console.log("Need to reopen " + res['channels'][channel_index]['remote_balance']*1000 + " < " + Math.abs(meterDelta));
 
           remaining_delta = Math.abs(meterDelta) - res['channels'][channel_index]['remote_balance']*1000 + res['channels'][channel_index]['remote_chan_reserve_sat']*1000;
@@ -498,9 +496,9 @@ app.put("/sensor-stats", async (req, res) => {
         } else {
           if (channel_index == null) {
             lndCreateChannel(direction);
-          } else {
-            lndSendMeterDelta(meterDelta, direction);
           }
+
+          lndSendMeterDelta(meterDelta, direction);
         }
       });
 
