@@ -10,6 +10,7 @@ const hhHandler = require("./household-handler");
 const zkHandler = require("./zk-handler");
 const web3Helper = require("../helpers/web3");
 const contractHelper = require("../helpers/contract");
+const request = require("request-promise");
 
 const serverConfig = require("../ned-server-config");
 
@@ -63,6 +64,7 @@ let lnd_request;
 let lightning;
 let invoiceListener;
 let options;
+let nettingStatus = new Date().getTime();
 
 async function init() {
   web3 = web3Helper.initWeb3(config.network);
@@ -108,6 +110,15 @@ async function init() {
     utilityAfterNetting.settle();
     console.log("Utility before Netting: ", utilityBeforeNetting)
     console.log("Utility after Netting: ", utilityAfterNetting)
+
+    nettingStatus = new Date().getTime() / 1000;
+
+    console.log(`Sleep for ${config.nettingInterval}ms ...`);
+    setTimeout(() => {
+      runZokrates();
+    }, config.nettingInterval);
+
+    /*
     let hhAddresses = zkHandler.generateProof(
       utilityBeforeNetting,
       utilityAfterNetting,
@@ -147,6 +158,7 @@ async function init() {
         runZokrates();
       }, config.nettingInterval);
     }
+    */
 
     shell.cd("..");
   }
@@ -214,24 +226,77 @@ app.get("/lnd/address", (req, res) => {
 });
 
 /**
+ * GET netting status of server
+ */
+app.get("/lnd/netting-active", (req, res) => {
+  try {
+    res.status(200);
+    res.json({
+      netting_status: nettingStatus
+    })
+  } catch (err) {
+    console.error("GET /lnd/netting-active", err.message);
+    res.status(400);
+    res.send(err);
+  }
+});
+
+/**
  * PUT /lnd/energy/:householdAddress
  */
 app.put("/lnd/energy/:householdAddress", (req, res) => {
   try {
+    const householdAddress = req.params.householdAddress;
     const { direction, invoice } = req.body;
     console.log(`Incoming invoice from ${req.params.householdAddress} with direction via ${direction}`);
 
     options = {
-      payment_request: invoice,
-      outgoing_chan_id: direction
+      pay_req: invoice
     }
 
-    lightning.sendPaymentSync(options, function(err, res) {
-      if (err || res['payment_error']) {
-        console.log('Can\'t pay invoice yet');
-      } else {
-        console.log('Payed invoice');
+    lightning.decodePayReq(options, function(err, res) {
+      const timestamp = res['timestamp']*1000;
+      console.log(timestamp);
+
+      let meterDelta = res['num_msat'];
+
+      options = {
+        payment_request: invoice,
+        outgoing_chan_id: direction
       }
+
+      lightning.sendPaymentSync(options, function(err, res) {
+        if (err || res['payment_error']) {
+          console.log('Can\'t pay invoice yet');
+        } else {
+          console.log('Payed invoice');
+
+          if (utility.addHousehold(householdAddress)) {
+            console.log(`New household ${householdAddress} added`);
+          }
+
+          options = {
+            active_only: true
+          }
+
+          lightning.listChannels(options, function(req, res) {
+            for (var i = 0; i < res['channels'].length; i++) {
+              if (res['channels'][i]['chan_id'] == direction) {
+                if (res['channels'][i]['capacity'] % 2 > 0) {
+                  meterDelta = meterDelta * -1;
+                }
+
+                console.log(
+                  `Incoming LND meter delta ${meterDelta} at ${timestamp} for ${householdAddress}`
+                );
+                utility.updateMeterDelta(householdAddress, meterDelta, timestamp);
+
+                break;
+              }
+            }
+          });
+        }
+      })
     })
 
     res.status(200);

@@ -64,6 +64,7 @@ let web3;
 let utilityContract;
 let latestBlockNumber;
 let nettingActive = false;
+let nettingStatus = 0;
 let lnrpc;
 let lndCert;
 let sslCreds;
@@ -76,14 +77,14 @@ let remaining_delta;
 let close;
 let channel_point;
 let direction;
-var lightning;
-var ned_server_lightning_address
-var ned_server_identity_pubkey;
-var ned_server_lightning_port;
-var ned_server_lightning_host;
-var call;
-var up_channel;
-var down_channel;
+let lightning;
+let ned_server_lightning_address
+let ned_server_identity_pubkey;
+let ned_server_lightning_port;
+let ned_server_lightning_host;
+let call;
+let up_channel;
+let down_channel;
 
 async function init() {
   web3 = web3Helper.initWeb3(config.network);
@@ -96,17 +97,17 @@ async function init() {
   };
 
   request(options).then(function (res) {
-      ned_server_identity_pubkey = res["identity_pubkey"];
-      ned_server_lightning_host = res["host"];
-      ned_server_lightning_port = res["port"];
+    ned_server_identity_pubkey = res["identity_pubkey"];
+    ned_server_lightning_host = res["host"];
+    ned_server_lightning_port = res["port"];
 
-      lightning = lndHandler();
-    }).then(function() {
-      ned_server_lightning_address = new lnrpc.LightningAddress(ned_server_identity_pubkey, ned_server_lightning_host + ":" + ned_server_lightning_port);
-      lndInitToNed(ned_server_lightning_address);
-    }).catch(function (err) {
-      console.log(err);
-    });
+    lightning = lndHandler();
+  }).then(function() {
+    ned_server_lightning_address = new lnrpc.LightningAddress(ned_server_identity_pubkey, ned_server_lightning_host + ":" + ned_server_lightning_port);
+    lndInitToNed(ned_server_lightning_address);
+  }).catch(function (err) {
+    console.log(err);
+  });
 
 
   utilityContract = new web3.eth.Contract(
@@ -326,7 +327,7 @@ function lndCreateChannel(direction) {
   options = {
     node_pubkey: byteBuffer.fromHex(ned_server_identity_pubkey),
     node_pubkey_string: ned_server_identity_pubkey,
-    local_funding_amount: 10000000*1.1,
+    local_funding_amount: direction ? 10000000*1.1 : 10000000*1.1 + 1,
     push_sat: 10000000,
     sat_per_byte: 0
   };
@@ -462,53 +463,70 @@ app.put("/sensor-stats", async (req, res) => {
       throw new Error("Invalid payload");
     }
 
-    if (!nettingActive) {
-      nettingActive = true;
+    // Init lightning channel to NED server
+    options = {
+      uri: `${config.nedUrl}/lnd/netting-active`,
+      json: true
+    };
 
-      options = {
-        active_only: true
-      };
+    request(options).then(function (res) {
+      if (res["netting_status"] != nettingStatus) {
+        console.log("Netting Successful!");
+        nettingStatus = res["netting_status"];
+        nettingActive = false;
+        transferHandler.collectTransfers(config);
+      }
+    }).then(function() {
+      if (!nettingActive) {
+        nettingActive = true;
 
-      lightning.listChannels(options, function (err, res) {
-        let channel_index = null;
-        if (meterDelta >= 0) {
-          direction = true;
-        } else {
-          direction = false;
-        }
+        options = {
+          active_only: true
+        };
 
-        for (var i = 0; i < res['channels'].length; i++) {
-            if ((res['channels'][i]['channel_point'].split(":")[0] == up_channel && meterDelta >= 0) || (res['channels'][i]['channel_point'].split(":")[0] == down_channel && meterDelta < 0)) {
-              channel_index = i;
-              break;
-            }
-        }
-
-        if (channel_index != null && (res['channels'].length > 0 && (res['channels'][channel_index]['remote_balance']*1000 - res['channels'][channel_index]['remote_chan_reserve_sat']*1000) < Math.abs(meterDelta))) {
-          console.log("Need to reopen " + res['channels'][channel_index]['remote_balance']*1000 + " < " + Math.abs(meterDelta));
-
-          remaining_delta = Math.abs(meterDelta) - res['channels'][channel_index]['remote_balance']*1000 + res['channels'][channel_index]['remote_chan_reserve_sat']*1000;
-
-          lndSendMeterDelta(res['channels'][channel_index]['remote_balance']*1000 - res['channels'][channel_index]['remote_chan_reserve_sat']*1000, direction);
-
-          // Transfer remaining
-          lndSendMeterDelta(remaining_delta, direction);
-        } else {
-          if (channel_index == null) {
-            lndCreateChannel(direction);
+        lightning.listChannels(options, function (err, res) {
+          let channel_index = null;
+          if (meterDelta >= 0) {
+            direction = true;
+          } else {
+            direction = false;
           }
 
-          lndSendMeterDelta(meterDelta, direction);
-        }
-      });
+          for (var i = 0; i < res['channels'].length; i++) {
+              if ((res['channels'][i]['channel_point'].split(":")[0] == up_channel && meterDelta >= 0) || (res['channels'][i]['channel_point'].split(":")[0] == down_channel && meterDelta < 0)) {
+                channel_index = i;
+                break;
+              }
+          }
 
+          if (channel_index != null && (res['channels'].length > 0 && (res['channels'][channel_index]['remote_balance']*1000 - res['channels'][channel_index]['remote_chan_reserve_sat']*1000) < Math.abs(meterDelta))) {
+            console.log("Need to reopen " + res['channels'][channel_index]['remote_balance']*1000 + " < " + Math.abs(meterDelta));
+
+            remaining_delta = Math.abs(meterDelta) - res['channels'][channel_index]['remote_balance']*1000 + res['channels'][channel_index]['remote_chan_reserve_sat']*1000;
+
+            lndSendMeterDelta(res['channels'][channel_index]['remote_balance']*1000 - res['channels'][channel_index]['remote_chan_reserve_sat']*1000, direction);
+
+            // Transfer remaining
+            lndSendMeterDelta(remaining_delta, direction);
+          } else {
+            if (channel_index == null) {
+              lndCreateChannel(direction);
+            }
+
+            lndSendMeterDelta(meterDelta, direction);
+          }
+        });
+      }
+
+      /*
       await energyHandler.putMeterReading(
         config,
         web3,
         utilityContract,
         meterDelta
       );
-    }
+      */
+    });
 
     await db.writeToDB(
       config.dbUrl,
