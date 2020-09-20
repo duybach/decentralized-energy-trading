@@ -18,6 +18,7 @@ tags: []
 **1.)** Deploying LND Node for household-server and netting-server:
 
 ```bash
+# Assumes lnd docker directory (/lnd/docker)
 export NETWORK="simnet" && docker volume create simnet_lnd_ned_server && docker-compose run -p 10009:10009 -p 9735:9735 -d --name ned_server --volume simnet_lnd_ned_server:/root/.lnd lnd
 
 export NETWORK="simnet" && docker volume create simnet_lnd_client && docker-compose run -p 10010:10009 -d --name client --volume simnet_lnd_client:/root/.lnd lnd
@@ -44,10 +45,10 @@ client$ lncli --network=simnet walletbalance
 **2.)** Export certificates for LND access:
 
 ```bash
-# Assumes household-server directory
+# Assumes household-server directory (/household-server)
 docker cp client:/root/.lnd/tls.cert tls.cert && docker cp client:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon && chmod -R 775 admin.macaroon
 
-# Assumes netting-server directory
+# Assumes netting-server directory (/netting-entity)
 docker cp ned_server:/root/.lnd/tls.cert tls.cert && docker cp ned_server:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon && chmod -R 775 admin.macaroon
 ```
 
@@ -63,8 +64,8 @@ yarn --cwd household-ui/ install
 ```bash
 yarn setup-zokrates
 
-# Edit Verifier.sol to verifier.sol
-# Remove "pragma solidity ^0.6.1;"" from verifier.sol file
+# Edit contracts/Verifier.sol to contracts/verifier.sol
+# Remove (2x) "pragma solidity ^0.6.1;"" from verifier.sol file
 
 yarn update-contract-bytecodes
 ```
