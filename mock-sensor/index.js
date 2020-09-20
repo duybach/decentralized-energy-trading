@@ -87,7 +87,7 @@ setInterval(() => {
   const consumeFactor =
     Math.sin((currentHour / 24) * Math.PI) + regularConsumeFactor;
   const produceFactor =
-    Math.sin((currentHour / 24) * Math.PI) + regularProduceFactor + 10000;
+    Math.sin((currentHour / 24) * Math.PI) + regularProduceFactor;
   let payload = {};
 
   /**
