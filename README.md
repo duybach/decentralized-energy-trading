@@ -15,7 +15,7 @@ tags: []
 
 ## Get started
 
-**0.1.)** Deploy Netting Entity & Client Entity Node:
+**1.)** Deploying LND Node for household-server and netting-server:
 
 ```bash
 export NETWORK="simnet" && docker volume create simnet_lnd_ned_server && docker-compose run -p 10009:10009 -p 9735:9735 -d --name ned_server --volume simnet_lnd_ned_server:/root/.lnd lnd
@@ -41,7 +41,7 @@ docker exec -it btcd /start-btcctl.sh getblockchaininfo | grep -A 1 segwit
 client$ lncli --network=simnet walletbalance
 ```
 
-**0.2.)** Deploy:
+**2.)** Export certificates for LND access:
 
 ```bash
 # Assumes household-server directory
@@ -51,14 +51,14 @@ docker cp client:/root/.lnd/tls.cert tls.cert && docker cp client:/root/.lnd/dat
 docker cp ned_server:/root/.lnd/tls.cert tls.cert && docker cp ned_server:/root/.lnd/data/chain/bitcoin/simnet/admin.macaroon admin.macaroon && chmod -R 775 admin.macaroon
 ```
 
-**1.)** Install dependencies
+**3.)** Install dependencies
 
 ```bash
 yarn install
 yarn --cwd household-ui/ install
 ```
 
-**2.)** Setup ZoKrates contract
+**4.)** Setup ZoKrates contract
 
 ```bash
 yarn setup-zokrates
@@ -69,7 +69,7 @@ yarn setup-zokrates
 yarn update-contract-bytecodes
 ```
 
-**3.)** Start the ethereum parity chain:
+**5.)** Start the ethereum parity chain:
 
 ```bash
 cd parity-authority
@@ -78,7 +78,7 @@ docker-compose up -d --build
 
 **ethstats** is available at: http://localhost:3001
 
-**4.)** Configure the contracts using truffle migrations:
+**6.)** Configure the contracts using truffle migrations:
 
 ```bash
 # Rename build/Verifier.json to build/verifier.json
@@ -86,7 +86,7 @@ docker-compose up -d --build
 yarn migrate-contracts-authority
 ```
 
-**5.)** Start the Netting Entity:
+**7.)** Start the Netting Entity:
 
 ```bash
 docker inspect ned_server | grep "IPAddress"
@@ -94,14 +94,14 @@ docker inspect ned_server | grep "IPAddress"
 yarn run-netting-entity -i 60000 -l 10009 -s netting-entity/tls.cert -m netting-entity/admin.macaroon -p 8123 -a <IPAddress>
 ```
 
-**6.)** Create two databases for both household servers:
+**8.)** Create two databases for both household servers:
 
 ```bash
 # Assumes project root directory
 docker-compose -f mongo/docker-compose.yml up -d
 ```
 
-**7.)** Start two household servers:
+**9.)** Start two household servers:
 
 ```bash
 # Household 1
@@ -123,7 +123,7 @@ yarn run-server -p 3003 -N http://localhost:8123 \
 
 **Note:** Depending on your network settings an extra flag `-h 127.0.0.1` could be needed for both households.
 
-**8.)** Start a mocked sensor for each household:
+**10.)** Start a mocked sensor for each household and Bitcoin Miner:
 
 ```bash
 # Household 1 with positive energy balance
@@ -135,7 +135,12 @@ yarn run-sensor -p 3002 -e +
 yarn run-sensor -p 3003 -e -
 ```
 
-**9.)** Start two household-ui applications:
+```bash
+# Start Bitcoin Miner
+sh ./miner.sh
+```
+
+**11.)** Start two household-ui applications:
 
 ```bash
 # Household 1
